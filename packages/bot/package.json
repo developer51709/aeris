@@ -1,0 +1,28 @@
+{
+  "name": "@aeris/bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@aeris/shared": "workspace:*",
+    "@discordjs/voice": "^0.18.0",
+    "@napi-rs/canvas": "^0.1.62",
+    "@prisma/client": "^6.2.0",
+    "cloudinary": "^2.5.1",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "meilisearch": "^0.44.1",
+    "sodium-native": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

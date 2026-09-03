@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Guild {
+  id            String   @id @default(cuid())
+  guildId       String   @unique
+  name          String
+  iconUrl       String?
+  prefix        String   @default("!")
+  logChannelId  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  automodRules      AutomodRule[]
+  levelingConfig    LevelingConfig?
+  economyConfig     EconomyConfig?
+  musicConfig       MusicConfig?
+  voicemasterConfig VoicemasterConfig?
+  ticketConfig      TicketConfig?
+  welcomeConfig     WelcomeConfig?
+  members           GuildMember[]
+  tickets           Ticket[]
+  moderationLogs    ModerationLog[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  discordId String   @unique
+  username  String
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members GuildMember[]
+}
+
+model GuildMember {
+  id        String @id @default(cuid())
+  guildId   String
+  userId    String
+  xp        Int    @default(0)
+  level     Int    @default(0)
+  balance   Int    @default(0)
+  lastDaily DateTime?
+
+  guild      Guild          @relation(fields: [guildId], references: [guildId])
+  user       User           @relation(fields: [userId], references: [discordId])
+  inventory  InventoryItem[]
+  @@unique([guildId, userId])
+}
+
+model AutomodRule {
+  id        String @id @default(cuid())
+  guildId   String
+  type      String
+  enabled   Bool   @default(true)
+  config    Json
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model LevelingConfig {
+  id              String @id @default(cuid())
+  guildId         String @unique
+  enabled         Bool   @default(true)
+  xpPerMessage    Int    @default(15)
+  xpCooldown      Int    @default(60)
+  levelUpChannelId String?
+  roleRewards     Json   @default("[]")
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model EconomyConfig {
+  id            String @id @default(cuid())
+  guildId       String @unique
+  enabled       Bool   @default(true)
+  currencyName  String @default("Coins")
+  currencyEmoji String @default("🪙")
+  dailyAmount   Int    @default(100)
+  workMin       Int    @default(50)
+  workMax       Int    @default(200)
+  workCooldown  Int    @default(3600)
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model InventoryItem {
+  id        String @id @default(cuid())
+  memberId  String
+  itemId    String
+  quantity  Int    @default(1)
+
+  member GuildMember @relation(fields: [memberId], references: [id])
+}
+
+model MusicConfig {
+  id          String @id @default(cuid())
+  guildId     String @unique
+  enabled     Bool   @default(true)
+  djRoleId    String?
+  defaultVolume Int  @default(75)
+  maxQueueSize  Int  @default(200)
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model VoicemasterConfig {
+  id          String @id @default(cuid())
+  guildId     String @unique
+  enabled     Bool   @default(true)
+  categoryId  String?
+  channelName String @default "{user}'s Channel"
+  userLimit   Int?
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model TicketConfig {
+  id            String @id @default(cuid())
+  guildId       String @unique
+  enabled       Bool   @default(true)
+  supportRoleId String?
+  categoryId    String?
+  maxTickets    Int    @default(5)
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model WelcomeConfig {
+  id              String @id @default(cuid())
+  guildId         String @unique
+  enabled         Bool   @default(true)
+  welcomeChannelId String?
+  welcomeMessage  String @default("Welcome to {server}, {user}!")
+  goodbyeMessage  String?
+  dmEnabled       Bool   @default(false)
+  dmMessage       String?
+  autoRoleId      String?
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model Ticket {
+  id        String   @id @default(cuid())
+  guildId   String
+  channelId String   @unique
+  creatorId String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  closedAt  DateTime?
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
+
+model ModerationLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  moderatorId String
+  action    String
+  reason    String?
+  duration  Int?
+  createdAt DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [guildId])
+}
