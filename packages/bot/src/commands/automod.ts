@@ -1,128 +1,245 @@
 import {
   SlashCommandBuilder,
-  PermissionFlagsBits,
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
-  SeparatorSpacingSize,
+  ChatInputCommandInteraction,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
 } from "discord.js";
+import { prisma } from "@aeris/shared";
 
-export const data = new SlashCommandBuilder()
-  .setName("automod")
-  .setDescription("Configure automod settings")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-  .addSubcommand((sub) =>
-    sub
-      .setName("add")
-      .setDescription("Add an automod rule")
-      .addStringOption((opt) =>
-        opt
-          .setName("type")
-          .setDescription("Rule type")
-          .setRequired(true)
-          .addChoices(
-            { name: "Word Filter", value: "word_filter" },
-            { name: "Link Filter", value: "link_filter" },
-            { name: "Spam Detection", value: "spam" },
-            { name: "Raid Protection", value: "raid" }
-          )
-      )
-      .addStringOption((opt) =>
-        opt
-          .setName("config")
-          .setDescription("JSON config for the rule")
-          .setRequired(true)
-      )
-  )
-  .addSubcommand((sub) =>
-    sub.setName("list").setDescription("List all automod rules")
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName("remove")
-      .setDescription("Remove an automod rule")
-      .addStringOption((opt) =>
-        opt.setName("type").setDescription("Rule type to remove").setRequired(true)
-      )
-  );
-
-export async function execute(interaction: any, prisma: any) {
-  const subcommand = interaction.options.getSubcommand();
-
-  if (subcommand === "add") {
-    const type = interaction.options.getString("type");
-    const configStr = interaction.options.getString("config");
-
-    let config;
-    try {
-      config = JSON.parse(configStr);
-    } catch {
-      return interaction.reply({
-        components: [
-          new ContainerBuilder().addTextDisplayComponents(
-            new TextDisplayBuilder().setContent("❌ Invalid JSON configuration.")
-          ),
-        ],
-        flags: 4096,
-        ephemeral: true,
-      });
-    }
-
-    await prisma.automodRule.create({
-      data: {
-        guildId: interaction.guild.id,
-        type,
-        config,
-      },
-    });
-
-    await interaction.reply({
-      components: [
-        new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `## ✅ Automod Rule Added\n\n**Type:** \`${type}\`\n**Status:** Enabled`
-            )
-          ),
-      ],
-      flags: 4096,
-    });
-  } else if (subcommand === "list") {
-    const rules = await prisma.automodRule.findMany({
-      where: { guildId: interaction.guild.id },
-    });
-
-    const ruleList =
-      rules.length > 0
-        ? rules.map((r: any) => `\`${r.type}\` — ${r.enabled ? "🟢" : "🔴"}`).join("\n")
-        : "No rules configured.";
-
-    await interaction.reply({
-      components: [
-        new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `## 🛡️ Automod Rules\n\n${ruleList}`
-            )
-          ),
-      ],
-      flags: 4096,
-    });
-  } else if (subcommand === "remove") {
-    const type = interaction.options.getString("type");
-    await prisma.automodRule.deleteMany({
-      where: { guildId: interaction.guild.id, type },
-    });
-
-    await interaction.reply({
-      components: [
-        new ContainerBuilder().addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `## 🗑️ Removed \`${type}\` rule`
-          )
+export default {
+  data: new SlashCommandBuilder()
+    .setName("automod")
+    .setDescription("Automod configuration commands")
+    .addSubcommand((sub) =>
+      sub
+        .setName("status")
+        .setDescription("View current automod status for this server"),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("enable")
+        .setDescription("Enable automod features")
+        .addBooleanOption((opt) =>
+          opt
+            .setName("word_filter")
+            .setDescription("Enable word filters")
+            .setRequired(false),
+        )
+        .addBooleanOption((opt) =>
+          opt
+            .setName("link_filter")
+            .setDescription("Enable link filters")
+            .setRequired(false),
+        )
+        .addBooleanOption((opt) =>
+          opt
+            .setName("spam")
+            .setDescription("Enable spam detection")
+            .setRequired(false),
+        )
+        .addBooleanOption((opt) =>
+          opt
+            .setName("raid")
+            .setDescription("Enable raid protection")
+            .setRequired(false),
         ),
-      ],
-      flags: 4096,
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("wordfilter")
+        .setDescription("Manage word filters")
+        .addStringOption((opt) =>
+          opt
+            .setName("word")
+            .setDescription("Word to add/remove")
+            .setRequired(true),
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("action")
+            .setDescription("Add or remove")
+            .setRequired(true)
+            .addChoices(
+              { name: "Add", value: "add" },
+              { name: "Remove", value: "remove" },
+            ),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("linkfilter")
+        .setDescription("Manage link filters")
+        .addStringOption((opt) =>
+          opt
+            .setName("domain")
+            .setDescription("Domain to add/remove")
+            .setRequired(true),
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("action")
+            .setDescription("Add or remove")
+            .setRequired(true)
+            .addChoices(
+              { name: "Add", value: "add" },
+              { name: "Remove", value: "remove" },
+            ),
+        ),
+    ),
+  async execute(interaction: ChatInputCommandInteraction) {
+    const guildId = interaction.guildId!;
+    const subcommand = interaction.options.getSubcommand();
+
+    switch (subcommand) {
+      case "status":
+        await handleStatus(interaction, guildId);
+        break;
+      case "enable":
+        await handleEnable(interaction, guildId);
+        break;
+      case "wordfilter":
+        await handleWordFilter(interaction, guildId);
+        break;
+      case "linkfilter":
+        await handleLinkFilter(interaction, guildId);
+        break;
+    }
+  },
+};
+
+async function handleStatus(
+  interaction: ChatInputCommandInteraction,
+  guildId: string,
+) {
+  const settings = await prisma
+    .automodSettings.findUnique({ where: { guildId } })
+    .catch(() => undefined);
+
+  const content = [
+    `**Automod Status** — ${interaction.guild?.name}`,
+    ``,
+    `Word Filter: ${settings?.wordFilters ? "Enabled" : "Disabled"}`,
+    `Link Filter: ${settings?.linkFilters ? "Enabled" : "Disabled"}`,
+    `Spam Detection: ${settings?.spamEnabled ? "Enabled" : "Disabled"}`,
+    `Raid Protection: ${settings?.raidEnabled ? "Enabled" : "Disabled"}`,
+    `Max Links per Message: ${settings?.maxLinks ?? 5}`,
+    `Max Emotes per Message: ${settings?.maxEmotes ?? 10}`,
+  ].join("\n");
+
+  await interaction.reply({ content, components: [] });
+}
+
+async function handleEnable(
+  interaction: ChatInputCommandInteraction,
+  guildId: string,
+) {
+  const word = interaction.options.getBoolean("word_filter");
+  const link = interaction.options.getBoolean("link_filter");
+  const spam = interaction.options.getBoolean("spam");
+  const raid = interaction.options.getBoolean("raid");
+
+  const existing = await prisma
+    .automodSettings.findUnique({ where: { guildId } })
+    .catch(() => undefined);
+
+  await prisma.automodSettings.upsert({
+    where: { guildId },
+    create: {
+      guildId,
+      wordFilters: word ? "[]" : existing?.wordFilters ?? "[]",
+      linkFilters: link ? "[]" : existing?.linkFilters ?? "[]",
+      spamEnabled: spam ?? true,
+      raidEnabled: raid ?? true,
+      maxLinks: existing?.maxLinks ?? 5,
+      maxEmotes: existing?.maxEmotes ?? 10,
+      blockInvites: existing?.blockInvites ?? true,
+    },
+    update: {
+      spamEnabled: spam ?? existing?.spamEnabled ?? true,
+      raidEnabled: raid ?? existing?.raidEnabled ?? true,
+      wordFilters: word ? JSON.stringify([]) : existing?.wordFilters ?? "[]",
+      linkFilters: link ? JSON.stringify([]) : existing?.linkFilters ?? "[]",
+    },
+  });
+
+  await interaction.reply({
+    content: "Automod settings updated successfully.",
+    components: [],
+  });
+}
+
+async function handleWordFilter(
+  interaction: ChatInputCommandInteraction,
+  guildId: string,
+) {
+  const word = interaction.options.getString("word")!;
+  const action = interaction.options.getString("action")!;
+
+  const settings = await prisma
+    .automodSettings.findUnique({ where: { guildId } })
+    .catch(() => undefined);
+
+  const list: string[] =
+    settings?.wordFilters ? JSON.parse(settings.wordFilters) : [];
+
+  if (action === "add") {
+    if (!list.includes(word)) list.push(word);
+    await prisma.automodSettings.update({
+      where: { guildId },
+      data: { wordFilters: JSON.stringify(list) },
+    });
+    await interaction.reply({
+      content: `Added word filter: **${word}**`,
+      components: [],
+    });
+  } else {
+    const next = list.filter((w) => w !== word);
+    await prisma.automodSettings.update({
+      where: { guildId },
+      data: { wordFilters: JSON.stringify(next) },
+    });
+    await interaction.reply({
+      content: `Removed word filter: **${word}**`,
+      components: [],
+    });
+  }
+}
+
+async function handleLinkFilter(
+  interaction: ChatInputCommandInteraction,
+  guildId: string,
+) {
+  const domain = interaction.options.getString("domain")!;
+  const action = interaction.options.getString("action")!;
+
+  const settings = await prisma
+    .automodSettings.findUnique({ where: { guildId } })
+    .catch(() => undefined);
+
+  const list: string[] =
+    settings?.linkFilters ? JSON.parse(settings.linkFilters) : [];
+
+  if (action === "add") {
+    if (!list.includes(domain)) list.push(domain);
+    await prisma.automodSettings.update({
+      where: { guildId },
+      data: { linkFilters: JSON.stringify(list) },
+    });
+    await interaction.reply({
+      content: `Added link filter for domain: **${domain}**`,
+      components: [],
+    });
+  } else {
+    const next = list.filter((d) => d !== domain);
+    await prisma.automodSettings.update({
+      where: { guildId },
+      data: { linkFilters: JSON.stringify(next) },
+    });
+    await interaction.reply({
+      content: `Removed link filter for domain: **${domain}**`,
+      components: [],
     });
   }
 }
