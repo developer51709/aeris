@@ -56,7 +56,7 @@ export async function generateLevelUpCard(
   ctx.font = "16px Inter, system-ui, sans-serif";
   ctx.fillText(`Total XP: ${totalXp.toLocaleString()}`, canvas.width / 2, 300);
 
-  const buffer = canvas.toBuffer("png");
+  const buffer = canvas.toBuffer("image/png");
   return await uploadToCloudinary(buffer, `levelup-${userId}-${level}.png`);
 }
 
@@ -87,7 +87,7 @@ export async function generateLeaderboardCard(
     ctx.fillText(`Lv.${entry.level}  ${entry.xp.toLocaleString()} XP`, 200, y);
   });
 
-  const buffer = canvas.toBuffer("png");
+  const buffer = canvas.toBuffer("image/png");
   return await uploadToCloudinary(buffer, `leaderboard-${guildId}.png`);
 }
 
@@ -119,7 +119,7 @@ export async function generateEconomyCard(
   ctx.font = "16px Inter, system-ui, sans-serif";
   ctx.fillText(`Total: ${(cash + bank).toLocaleString()}`, canvas.width / 2, 240);
 
-  const buffer = canvas.toBuffer("png");
+  const buffer = canvas.toBuffer("image/png");
   return await uploadToCloudinary(buffer, `economy-${userId}.png`);
 }
 
@@ -154,6 +154,6 @@ export async function generateBlackjackCard(
   ctx.font = "20px Inter, system-ui, sans-serif";
   ctx.fillText(`Bet: 10  |  Payout: ${won}`, canvas.width / 2, 270);
 
-  const buffer = canvas.toBuffer("png");
+  const buffer = canvas.toBuffer("image/png");
   return await uploadToCloudinary(buffer, `blackjack-${userId}-${Date.now()}.png`);
 }

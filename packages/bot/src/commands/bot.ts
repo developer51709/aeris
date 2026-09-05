@@ -1,7 +1,7 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  ChannelType,
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 
@@ -65,4 +65,4 @@ export default {
       });
     }
   },
-} satisfies { data: SlashCommandBuilder; execute(interaction: ChatInputCommandInteraction): Promise<void> };
+}

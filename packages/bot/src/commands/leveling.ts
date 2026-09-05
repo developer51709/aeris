@@ -115,11 +115,11 @@ async function handleRank(
     })
     .catch(() => []);
 
-  const rank = entries.findIndex((e) => e.userId === target.id) + 1;
-  const total = entries.length;
+  const rank = (entries as { userId: string }[]).findIndex((e) => e.userId === target.id) + 1;
+  const total = (entries as unknown[]).length;
   const place = rank > 0 ? rank : "—";
 
-  const data = entries.find((e) => e.userId === target.id);
+  const data = (entries as { userId: string; level: number; totalXp: number }[]).find((e) => e.userId === target.id);
 
   const content = [
     `**Leaderboard Rank** — ${target.username ?? "Unknown"}`,
@@ -144,7 +144,7 @@ async function handleLeaderboard(
     })
     .catch(() => []);
 
-  const pageEntries = entries.slice(page * 10, page * 10 + 10);
+  const pageEntries = (entries as { userId: string; level: number; totalXp: number }[]).slice(page * 10, page * 10 + 10);
   if (pageEntries.length === 0) {
     await interaction.reply({
       content: page === 0
@@ -155,7 +155,7 @@ async function handleLeaderboard(
     return;
   }
 
-  const lines = pageEntries.map((e, i) => {
+  const lines = pageEntries.map((e: { userId: string; level: number; totalXp: number }, i: number) => {
     const rank = page * 10 + i + 1;
     const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
     const user = e.userId;

@@ -39,8 +39,8 @@ export async function onMessageCreate(message: Message) {
         .levelingData.findUnique({ where: { id: `${guildId}:${userId}` } })
         .catch(() => undefined);
 
-      if (data && maybeLevelUp(message, data, guildId, userId, leveling)) {
-        return;
+      if (data) {
+        await maybeLevelUp(message, data, guildId, userId, leveling);
       }
     }
   } catch (error) {
@@ -76,8 +76,8 @@ async function maybeLevelUp(
     .replace("{user}", message.author.username)
     .replace("{level}", String(next.level));
 
-  await message.channel.send({
-    content: formatted,
-    components: [],
-  });
+  const channel = message.channel;
+  if ("send" in channel) {
+    await (channel as { send: (opts: { content: string }) => Promise<unknown> }).send({ content: formatted });
+  }
 }

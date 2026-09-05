@@ -1,186 +1,134 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 
 export default {
   data: new SlashCommandBuilder()
     .setName("economy")
-    .setDescription("Economy system commands")
+    .setDescription("Economy commands")
+    .addSubcommand((sub) => sub.setName("balance").setDescription("Check your balance"))
+    .addSubcommand((sub) => sub.setName("daily").setDescription("Claim your daily reward"))
     .addSubcommand((sub) =>
-      sub
-        .setName("balance")
-        .setDescription("Check your or another user's balance")
-        .addUserOption((opt) =>
-          opt.setName("user").setDescription("User to check").setRequired(false),
-        ),
+      sub.setName("work").setDescription("Work for coins"),
     )
     .addSubcommand((sub) =>
       sub
-        .setName("daily")
-        .setDescription("Claim your daily rewards"),
+        .setName("pay")
+        .setDescription("Send coins to another user")
+        .addUserOption((o) => o.setName("user").setDescription("Recipient").setRequired(true))
+        .addIntegerOption((o) => o.setName("amount").setDescription("Amount").setRequired(true).setMinValue(1)),
     )
     .addSubcommand((sub) =>
-      sub
-        .setName("work")
-        .setDescription("Earn some cash by working"),
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName("leaderboard")
-        .setDescription("View the server economy leaderboard")
-        .addIntegerOption((opt) =>
-          opt
-            .setName("page")
-            .setDescription("Page number")
-            .setMinValue(1)
-            .setMaxValue(100)
-            .setRequired(false),
-        ),
+      sub.setName("leaderboard").setDescription("Economy leaderboard"),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId!;
-    const subcommand = interaction.options.getSubcommand();
+    const userId = interaction.user.id;
+    const key = `${guildId}:${userId}`;
 
-    switch (subcommand) {
-      case "balance":
-        return handleBalance(interaction, guildId);
-      case "daily":
-        return handleDaily(interaction, guildId);
-      case "work":
-        return handleWork(interaction, guildId);
-      case "leaderboard":
-        return handleEcoLeaderboard(interaction, guildId);
+    const getWallet = () =>
+      prisma.economyUser.upsert({
+        where: { id: key },
+        create: { id: key, guildId, userId },
+        update: {},
+      });
+
+    switch (interaction.options.getSubcommand()) {
+      case "balance": {
+        const w = await getWallet();
+        await interaction.reply({
+          content: `💰 **Balance** — Cash: **${w.cash}** | Bank: **${w.bank}**`,
+        });
+        break;
+      }
+      case "daily": {
+        const w = await getWallet();
+        const now = Date.now();
+        const last = w.lastDaily ? new Date(w.lastDaily).getTime() : 0;
+        const cooldown = 24 * 60 * 60 * 1000;
+        if (now - last < cooldown) {
+          const remaining = Math.ceil((cooldown - (now - last)) / 3600000);
+          await interaction.reply({
+            content: `⏳ You already claimed your daily reward. Come back in **${remaining}h**.`,
+          });
+          return;
+        }
+        const settings = await prisma.economySettings.findUnique({ where: { guildId } });
+        const amount = settings?.dailyAmount ?? 500;
+        await prisma.economyUser.update({
+          where: { id: key },
+          data: { cash: { increment: amount }, lastDaily: new Date() },
+        });
+        await interaction.reply({
+          content: `🎁 Daily reward claimed: **${amount}** coins!`,
+        });
+        break;
+      }
+      case "work": {
+        const earnings = Math.floor(Math.random() * 150) + 50;
+        await getWallet();
+        await prisma.economyUser.update({
+          where: { id: key },
+          data: { cash: { increment: earnings } },
+        });
+        const jobs = ["delivered packages", "walked dogs", "tutored students", "fixed a server", "wrote some code"];
+        const job = jobs[Math.floor(Math.random() * jobs.length)];
+        await interaction.reply({
+          content: `🛠️ You ${job} and earned **${earnings}** coins!`,
+        });
+        break;
+      }
+      case "pay": {
+        const target = interaction.options.getUser("user")!;
+        const amount = interaction.options.getInteger("amount")!;
+        if (target.id === userId) {
+          await interaction.reply({ content: "❌ You can't pay yourself." });
+          return;
+        }
+        const w = await getWallet();
+        if (w.cash < amount) {
+          await interaction.reply({ content: "❌ Insufficient funds." });
+          return;
+        }
+        const targetKey = `${guildId}:${target.id}`;
+        await prisma.economyUser.upsert({
+          where: { id: targetKey },
+          create: { id: targetKey, guildId, userId: target.id, cash: amount },
+          update: { cash: { increment: amount } },
+        });
+        await prisma.economyUser.update({
+          where: { id: key },
+          data: { cash: { decrement: amount } },
+        });
+        await interaction.reply({
+          content: `✅ Sent **${amount}** coins to ${target}.`,
+        });
+        break;
+      }
+      case "leaderboard": {
+        const rows = await prisma.economyUser.findMany({
+          where: { guildId },
+          orderBy: [{ cash: "desc" }, { bank: "desc" }],
+          take: 10,
+        });
+        if (rows.length === 0) {
+          await interaction.reply({ content: "No economy data yet." });
+          return;
+        }
+        const lines = rows.map(
+          (r: { userId: string; cash: number; bank: number }, i: number) => `**${i + 1}.** <@${r.userId}> — 💰 ${r.cash} | 🏦 ${r.bank}`,
+        );
+        await interaction.reply({
+          content: `**💰 Economy Leaderboard**\n\n${lines.join("\n")}`,
+        });
+        break;
+      }
     }
   },
 };
-
-async function handleBalance(
-  interaction: ChatInputCommandInteraction,
-  guildId: string,
-) {
-  const target = interaction.options.getUser("user") ?? interaction.user;
-  const data = await prisma.economyUser.findUnique({
-    where: { id: `${guildId}:${target.id}` },
-  });
-
-  const balance = data ?? { cash: 0, bank: 0 };
-
-  await interaction.reply({
-    content: [
-      `**Balance** — ${target.username ?? "Unknown"}`,
-      `Cash: **${balance.cash.toLocaleString()}**`,
-      `Bank: **${balance.bank.toLocaleString()}**`,
-      `Total: **${(balance.cash + balance.bank).toLocaleString()}**`,
-    ].join("\n"),
-    components: [],
-  });
-}
-
-async function handleDaily(interaction: ChatInputCommandInteraction, guildId: string) {
-  const memberId = interaction.user.id;
-  const data = await prisma.economyUser.findUnique({
-    where: { id: `${guildId}:${memberId}` },
-  });
-
-  if (data && data.lastDaily) {
-    const diff = Date.now() - data.lastDaily.getTime();
-    if (diff < 86400000) {
-      await interaction.reply({
-        content: "You already claimed your daily reward. Come back in 24 hours.",
-        components: [],
-      });
-      return;
-    }
-  }
-
-  const earning = 500 + Math.floor(Math.random() * 100);
-  await prisma.economyUser.upsert({
-    where: { id: `${guildId}:${memberId}` },
-    create: {
-      id: `${guildId}:${memberId}`,
-      guildId,
-      userId: memberId,
-      cash: earning,
-    },
-    update: {
-      cash: { increment: earning },
-      lastDaily: new Date(),
-    },
-  });
-
-  const settings = await prisma.economySettings.findUnique({ where: { guildId } });
-  const amount = settings?.dailyAmount ?? earning;
-
-  await interaction.reply({
-    content: `You collected your daily reward of **${amount}** coins!`,
-    components: [],
-  });
-}
-
-async function handleWork(interaction: ChatInputCommandInteraction, guildId: string) {
-  const memberId = interaction.user.id;
-  const earning = 100 + Math.floor(Math.random() * 400);
-  const job = [
-    "Programmer",
-    "Artist",
-    "Chef",
-    "Builder",
-    "Miner",
-    "Merchant",
-  ][Math.floor(Math.random() * 6)];
-
-  await prisma.economyUser.upsert({
-    where: { id: `${guildId}:${memberId}` },
-    create: {
-      id: `${guildId}:${memberId}`,
-      guildId,
-      userId: memberId,
-      cash: earning,
-    },
-    update: {
-      cash: { increment: earning },
-    },
-  });
-
-  await interaction.reply({
-    content: `You worked as a **${job}** and earned **${earning}** coins!`,
-    components: [],
-  });
-}
-
-async function handleEcoLeaderboard(
-  interaction: ChatInputCommandInteraction,
-  guildId: string,
-) {
-  const page = (interaction.options.getInteger("page") ?? 1) - 1;
-  const entries = await prisma
-    .economyUser.findMany({
-      where: { guildId },
-      orderBy: { cash: "desc" },
-    })
-    .catch(() => []);
-
-  const pageEntries = entries.slice(page * 10, page * 10 + 10);
-  if (pageEntries.length === 0) {
-    await interaction.reply({
-      content: page === 0
-        ? "No one has any cash yet."
-        : "No entries on this page.",
-      components: [],
-    });
-    return;
-  }
-
-  const lines = pageEntries.map((e, i) => {
-    const rank = page * 10 + i + 1;
-    const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
-    return `${medal}  <@${e.userId}> — **${e.cash.toLocaleString()}**`;
-  });
-
-  await interaction.reply({
-    content: ["**Economy Leaderboard**", ...lines].join("\n"),
-    components: [],
-  });
-}

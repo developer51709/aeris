@@ -1,6 +1,7 @@
-import { Client, GatewayIntentBits, Partials } from "discord.js";
+import { Client, GatewayIntentBits, Partials, Events } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { registerCommands } from "./commands/registry.js";
+import { loadInteractionHandlers, routeInteraction } from "./commands/interaction-router.js";
 import { initEventHandlers } from "./events/index.js";
 
 const client = new Client({
@@ -14,11 +15,16 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.User],
 });
 
-client.once("ready", async () => {
+client.once(Events.ClientReady, async () => {
   console.log(`Aeris ready as ${client.user?.tag}`);
-
+  await loadInteractionHandlers(client);
   await registerCommands(client);
   initEventHandlers(client);
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  await routeInteraction(interaction);
 });
 
 async function main() {

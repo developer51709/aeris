@@ -7,4 +7,4 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     await interaction.reply({ content: "Pong!", components: [] });
   },
-} satisfies { data: SlashCommandBuilder; execute(interaction: ChatInputCommandInteraction): Promise<void> };
+}

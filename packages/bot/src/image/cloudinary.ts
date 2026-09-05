@@ -13,18 +13,10 @@ export async function uploadToCloudinary(
   buffer: Buffer,
   publicId: string,
 ): Promise<string> {
-  const res = await cloudinary.uploader.upload_stream(
-    {
-      folder: FOLDER,
-      public_id: publicId.replace(/\.[^.]+$/, ""),
-      resource_type: "raw",
-      overwrite: true,
-    },
-    (error, result) => {
-      if (error) throw error;
-      return result;
-    },
-  );
+  if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    // No Cloudinary configured — fall back to a data URI so cards still render.
+    return `data:image/png;base64,${buffer.toString("base64")}`;
+  }
 
   return new Promise((resolve, reject) => {
     const upload = cloudinary.uploader.upload_stream(
