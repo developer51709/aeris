@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n bot,api,dashboard -c blue,green,magenta \"pnpm --filter @aeris/bot dev\" \"pnpm --filter @aeris/api dev\" \"pnpm --filter @aeris/dashboard dev\"",
-    "build": "pnpm --filter @aeris/shared build && concurrently pnpm:build:*",
+    "build": "pnpm --filter @aeris/shared build && concurrently -n bot,api,dashboard \"pnpm --filter @aeris/bot build\" \"pnpm --filter @aeris/api build\" \"pnpm --filter @aeris/dashboard build\"",
     "build:bot": "pnpm --filter @aeris/bot build",
     "build:api": "pnpm --filter @aeris/api build",
     "build:dashboard": "pnpm --filter @aeris/dashboard build",

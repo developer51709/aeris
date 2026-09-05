@@ -8,166 +8,149 @@ datasource db {
 }
 
 model Guild {
-  id            String   @id @default(cuid())
-  guildId       String   @unique
-  name          String
-  iconUrl       String?
-  prefix        String   @default("!")
-  logChannelId  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  automodRules      AutomodRule[]
-  levelingConfig    LevelingConfig?
-  economyConfig     EconomyConfig?
-  musicConfig       MusicConfig?
-  voicemasterConfig VoicemasterConfig?
-  ticketConfig      TicketConfig?
-  welcomeConfig     WelcomeConfig?
-  members           GuildMember[]
-  tickets           Ticket[]
-  moderationLogs    ModerationLog[]
+  id          String   @id
+  name        String?
+  icon        String?
+  memberCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model User {
-  id        String   @id @default(cuid())
-  discordId String   @unique
-  username  String
-  avatar    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  members GuildMember[]
+  id          String   @id
+  username    String?
+  displayName String?
+  avatar      String?
+  createdAt   DateTime @default(now())
 }
 
 model GuildMember {
-  id        String @id @default(cuid())
-  guildId   String
-  userId    String
-  xp        Int    @default(0)
-  level     Int    @default(0)
-  balance   Int    @default(0)
-  lastDaily DateTime?
+  id       String   @id
+  guildId  String
+  userId   String
+  joinedAt DateTime? @default(now())
+  role     String?
+}
 
-  guild      Guild          @relation(fields: [guildId], references: [guildId])
-  user       User           @relation(fields: [userId], references: [discordId])
-  inventory  InventoryItem[]
+model AutomodSettings {
+  id           String   @id
+  guildId      String   @unique
+  wordFilters  String   @default("[]")
+  linkFilters  String   @default("[]")
+  spamEnabled  Boolean  @default(true)
+  raidEnabled  Boolean  @default(true)
+  maxLinks     Int      @default(5)
+  maxEmotes    Int      @default(10)
+  blockInvites Boolean  @default(true)
+}
+
+model LevelingSettings {
+  id             String   @id
+  guildId        String   @unique
+  enabled        Boolean  @default(true)
+  xpMessage      String   @default("Your message earned you **{xp}** XP!")
+  levelUpMessage String   @default("🎉 **{user}** just leveled up to **Level {level}**!")
+  autoRole       String?
+}
+
+model LevelingData {
+  id      String   @id
+  guildId String
+  userId  String
+  level   Int      @default(1)
+  xp      Int      @default(0)
+  totalXp Int      @default(0)
+
   @@unique([guildId, userId])
 }
 
-model AutomodRule {
-  id        String @id @default(cuid())
+model EconomySettings {
+  id          String   @id
+  guildId     String   @unique
+  enabled     Boolean  @default(true)
+  dailyAmount Int      @default(500)
+  minCash     Int      @default(0)
+}
+
+model EconomyUser {
+  id        String   @id
   guildId   String
-  type      String
-  enabled   Bool   @default(true)
-  config    Json
+  userId    String
+  cash      Int      @default(0)
+  bank      Int      @default(0)
+  lastDaily DateTime?
 
-  guild Guild @relation(fields: [guildId], references: [guildId])
+  @@unique([guildId, userId])
 }
 
-model LevelingConfig {
-  id              String @id @default(cuid())
-  guildId         String @unique
-  enabled         Bool   @default(true)
-  xpPerMessage    Int    @default(15)
-  xpCooldown      Int    @default(60)
-  levelUpChannelId String?
-  roleRewards     Json   @default("[]")
+model EconomyInventory {
+  id       String   @id
+  guildId  String
+  userId   String
+  itemId   String
+  quantity Int      @default(1)
 
-  guild Guild @relation(fields: [guildId], references: [guildId])
-}
-
-model EconomyConfig {
-  id            String @id @default(cuid())
-  guildId       String @unique
-  enabled       Bool   @default(true)
-  currencyName  String @default("Coins")
-  currencyEmoji String @default("🪙")
-  dailyAmount   Int    @default(100)
-  workMin       Int    @default(50)
-  workMax       Int    @default(200)
-  workCooldown  Int    @default(3600)
-
-  guild Guild @relation(fields: [guildId], references: [guildId])
-}
-
-model InventoryItem {
-  id        String @id @default(cuid())
-  memberId  String
-  itemId    String
-  quantity  Int    @default(1)
-
-  member GuildMember @relation(fields: [memberId], references: [id])
-}
-
-model MusicConfig {
-  id          String @id @default(cuid())
-  guildId     String @unique
-  enabled     Bool   @default(true)
-  djRoleId    String?
-  defaultVolume Int  @default(75)
-  maxQueueSize  Int  @default(200)
-
-  guild Guild @relation(fields: [guildId], references: [guildId])
-}
-
-model VoicemasterConfig {
-  id          String @id @default(cuid())
-  guildId     String @unique
-  enabled     Bool   @default(true)
-  categoryId  String?
-  channelName String @default "{user}'s Channel"
-  userLimit   Int?
-
-  guild Guild @relation(fields: [guildId], references: [guildId])
+  @@unique([guildId, userId, itemId])
 }
 
 model TicketConfig {
-  id            String @id @default(cuid())
-  guildId       String @unique
-  enabled       Bool   @default(true)
-  supportRoleId String?
-  categoryId    String?
-  maxTickets    Int    @default(5)
-
-  guild Guild @relation(fields: [guildId], references: [guildId])
-}
-
-model WelcomeConfig {
-  id              String @id @default(cuid())
-  guildId         String @unique
-  enabled         Bool   @default(true)
-  welcomeChannelId String?
-  welcomeMessage  String @default("Welcome to {server}, {user}!")
-  goodbyeMessage  String?
-  dmEnabled       Bool   @default(false)
-  dmMessage       String?
-  autoRoleId      String?
-
-  guild Guild @relation(fields: [guildId], references: [guildId])
+  id                 String   @id
+  guildId            String   @unique
+  channelId          String?
+  categoryId         String?
+  transcriptEnabled  Boolean  @default(true)
+  closable           Boolean  @default(true)
 }
 
 model Ticket {
-  id        String   @id @default(cuid())
-  guildId   String
-  channelId String   @unique
-  creatorId String
-  status    String   @default("open")
-  createdAt DateTime @default(now())
-  closedAt  DateTime?
+  id             String   @id
+  guildId        String
+  channelId      String
+  openerId       String
+  subject        String?
+  createdAt      DateTime @default(now())
+  closedAt       DateTime?
+  transcriptUrl  String?
+}
 
-  guild Guild @relation(fields: [guildId], references: [guildId])
+model WelcomeConfig {
+  id                String   @id
+  guildId           String   @unique
+  channelId         String?
+  message           String   @default("Welcome {user} to {server}! 👋")
+  dmEnabled         Boolean  @default(false)
+  dmMessage         String   @default("Welcome to {server}, {user}!")
+  goodbyeChannelId  String?
+  goodbyeMessage    String   @default("Goodbye {user}!")
+  autoRoleId        String?
+}
+
+model MusicQueue {
+  id         String   @id
+  guildId    String   @unique
+  channelId  String?
+  nowPlaying String?
+  queue      String   @default("[]")
 }
 
 model ModerationLog {
-  id        String   @id @default(cuid())
-  guildId   String
-  userId    String
-  moderatorId String
-  action    String
-  reason    String?
-  duration  Int?
-  createdAt DateTime @default(now())
+  id           String   @id
+  guildId      String
+  userId       String
+  action       String
+  reason       String?
+  moderatorId  String?
+  createdAt    DateTime @default(now())
+}
 
-  guild Guild @relation(fields: [guildId], references: [guildId])
+model EconomyShopItem {
+  id          String   @id
+  guildId     String
+  name        String
+  description String?
+  price       Int
+  category    String   @default("general")
+  icon        String?
+
+  @@unique([guildId, id])
 }
