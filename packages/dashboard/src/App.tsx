@@ -10,15 +10,21 @@ import { api } from "./lib/api";
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     api
       .get("/auth/me")
       .then((data) => {
-        setSession(data as { id: string });
+        if (typeof data?.id === "string") {
+          setSession(data as { id: string });
+        }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setAuthError("Please sign in to continue.");
+        setLoading(false);
+      });
   }, []);
 
   if (loading)
@@ -29,6 +35,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         </div>
       </Layout>
     );
+
+  if (authError)
+    return (
+      <Layout>
+        <div className="flex min-h-[60vh] items-center justify-center px-4">
+          <div className="w-full max-w-lg rounded-2xl border border-danger/40 bg-danger/5 p-8 text-center">
+            <p className="text-sm text-danger">{authError}</p>
+            <a
+              href="/auth"
+              className="mt-4 inline-flex items-center justify-center rounded-xl bg-brand text-white px-5 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-all"
+            >
+              Go to sign-in
+            </a>
+          </div>
+        </div>
+      </Layout>
+    );
+
   if (!session) return <Navigate to="/auth" replace />;
   return <Layout>{children}</Layout>;
 }

@@ -3,60 +3,97 @@ import { prisma } from "@aeris/shared";
 
 const router = Router();
 
-function requireAuth(req: Request): any {
+function requireAuth(req: Request): { id: string; username: string; avatar?: string | null; guildIds: string[] } {
   const user = (req.session as any)?.user;
-  if (!user) {
+  if (!user || typeof user?.id !== "string") {
     throw new Error("Unauthorized");
   }
-  return user;
+  return user as { id: string; username: string; avatar?: string | null; guildIds: string[] };
 }
 
 router.get("/guilds", async (req: Request, res: Response) => {
   try {
-    const user = requireAuth(req);
-    // In MVP return the guilds the user manages that also have Aeris presence
+    requireAuth(req);
+    const userManagedGuilds = (req.session as any)?.user?.guildIds ?? [];
+
     const guilds = await prisma.guild.findMany({
       where: {
-        // Placeholder: in real setup this would come from bot presence check
+        id: { in: userManagedGuilds.length ? userManagedGuilds : undefined },
         name: { not: null },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    if (guilds.length === 0) {
+      return res.status(404).json({
+        error: "No servers found",
+        message: "Connect Aeris to a Discord server you manage, then refresh.",
+      });
+    }
+
     return res.json(guilds);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/guilds error:", error);
+    return res.status(500).json({
+      error: "Failed to load servers",
+      message: "Could not load your servers. Please try again later.",
+    });
   }
 });
 
 router.get("/guilds/:id", async (req: Request, res: Response) => {
   try {
-    const user = requireAuth(req);
+    requireAuth(req);
     const guild = await prisma.guild.findUnique({
       where: { id: req.params.id },
     });
-    if (!guild) return res.status(404).json({ error: "Guild not found" });
+    if (!guild) {
+      return res.status(404).json({
+        error: "Server not found",
+        message: "The requested server does not exist or is unavailable.",
+      });
+    }
     return res.json(guild);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/guilds/:id error:", error);
+    return res.status(500).json({
+      error: "Failed to load server",
+      message: "Could not load the requested server. Please try again later.",
+    });
   }
 });
 
 router.put("/guilds/:id", async (req: Request, res: Response) => {
   try {
-    const user = requireAuth(req);
-    const body = req.body;
+    requireAuth(req);
+    const body = req.body ?? {};
 
     const guild = await prisma.guild.update({
       where: { id: req.params.id },
       data: {
-        name: body.name ?? undefined,
-        icon: body.icon ?? undefined,
-        memberCount: body.memberCount ?? undefined,
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.icon !== undefined ? { icon: body.icon } : {}),
+        ...(body.memberCount !== undefined && typeof body.memberCount === "number"
+          ? { memberCount: body.memberCount }
+          : {}),
       },
     });
     return res.json(guild);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("PUT /api/guilds/:id error:", error);
+    return res.status(500).json({
+      error: "Failed to update server",
+      message: "Could not update the server settings. Please try again later.",
+    });
   }
 });
 
@@ -65,10 +102,12 @@ router.get("/guilds/:id/stats", async (req: Request, res: Response) => {
     requireAuth(req);
     const guildId = req.params.id;
 
+    const memberCountResult = prisma.guild
+      .findUnique({ where: { id: guildId } })
+      .then((g: { memberCount: number } | null) => g?.memberCount ?? 0);
+
     const [memberCount, levelingCount, economyCount] = await Promise.all([
-      prisma.guild
-        .findUnique({ where: { id: guildId } })
-        .then((g: { memberCount: number } | null) => g?.memberCount ?? 0),
+      memberCountResult,
       prisma.levelingData.count({ where: { guildId } }),
       prisma.economyUser.count({ where: { guildId } }),
     ]);
@@ -79,9 +118,17 @@ router.get("/guilds/:id/stats", async (req: Request, res: Response) => {
       economyUsers: economyCount,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/guilds/:id/stats error:", error);
+    return res.status(500).json({
+      error: "Failed to load stats",
+      message: "Could not load server stats. Please try again later.",
+    });
   }
 });
+
 
 router.get("/guilds/:id/leaderboard", async (req: Request, res: Response) => {
   try {
@@ -145,8 +192,12 @@ router.post("/guilds/:id/test-card", async (req: Request, res: Response) => {
 router.get("/settings/:guildId/automod", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
     const settings = await prisma.automodSettings.findUnique({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
     });
     return res.json(settings ?? {
       wordFilters: [],
@@ -158,16 +209,27 @@ router.get("/settings/:guildId/automod", async (req: Request, res: Response) => 
       blockInvites: true,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/settings/:guildId/automod error:", error);
+    return res.status(500).json({
+      error: "Failed to load automod settings",
+      message: "Could not load automod settings. Please try again later.",
+    });
   }
 });
 
 router.put("/settings/:guildId/automod", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
-    const data = req.body;
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
+    const data = req.body as any;
     const settings = await prisma.automodSettings.upsert({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
       create: {
         guildId: req.params.guildId,
         wordFilters: JSON.stringify(data.wordFilters ?? []),
@@ -190,7 +252,14 @@ router.put("/settings/:guildId/automod", async (req: Request, res: Response) => 
     });
     return res.json(settings);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("PUT /api/settings/:guildId/automod error:", error);
+    return res.status(500).json({
+      error: "Failed to save automod settings",
+      message: "Could not save automod settings. Please try again later.",
+    });
   }
 });
 
@@ -207,7 +276,51 @@ router.get("/settings/:guildId/leveling", async (req: Request, res: Response) =>
       autoRole: null,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/settings/:guildId/leveling error:", error);
+    return res.status(500).json({
+      error: "Failed to load leveling settings",
+      message: "Could not load leveling settings. Please try again later.",
+    });
+  }
+});
+
+router.put("/settings/:guildId/leveling", async (req: Request, res: Response) => {
+  try {
+    requireAuth(req);
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
+    const data = req.body as any;
+    const settings = await prisma.levelingSettings.upsert({
+      where: { guildId },
+      create: {
+        guildId,
+        enabled: data.enabled ?? true,
+        xpMessage: data.xpMessage ?? "Your message earned you **{xp}** XP!",
+        levelUpMessage: data.levelUpMessage ?? "🎉 **{user}** just leveled up to **Level {level}**!",
+        autoRole: data.autoRole ?? null,
+      },
+      update: {
+        enabled: data.enabled ?? true,
+        xpMessage: data.xpMessage ?? "Your message earned you **{xp}** XP!",
+        levelUpMessage: data.levelUpMessage ?? "🎉 **{user}** just leveled up to **Level {level}**!",
+        autoRole: data.autoRole ?? null,
+      },
+    });
+    return res.json(settings);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("PUT /api/settings/:guildId/leveling error:", error);
+    return res.status(500).json({
+      error: "Failed to save leveling settings",
+      message: "Could not save leveling settings. Please try again later.",
+    });
   }
 });
 
@@ -240,8 +353,12 @@ router.put("/settings/:guildId/leveling", async (req: Request, res: Response) =>
 router.get("/settings/:guildId/economy", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
     const settings = await prisma.economySettings.findUnique({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
     });
     return res.json(settings ?? {
       enabled: true,
@@ -249,18 +366,29 @@ router.get("/settings/:guildId/economy", async (req: Request, res: Response) => 
       minCash: 0,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/settings/:guildId/economy error:", error);
+    return res.status(500).json({
+      error: "Failed to load economy settings",
+      message: "Could not load economy settings. Please try again later.",
+    });
   }
 });
 
 router.put("/settings/:guildId/economy", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
-    const data = req.body;
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
+    const data = req.body as any;
     const settings = await prisma.economySettings.upsert({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
       create: {
-        guildId: req.params.guildId,
+        guildId,
         enabled: data.enabled ?? true,
         dailyAmount: data.dailyAmount ?? 500,
         minCash: data.minCash ?? 0,
@@ -273,15 +401,26 @@ router.put("/settings/:guildId/economy", async (req: Request, res: Response) => 
     });
     return res.json(settings);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("PUT /api/settings/:guildId/economy error:", error);
+    return res.status(500).json({
+      error: "Failed to save economy settings",
+      message: "Could not save economy settings. Please try again later.",
+    });
   }
 });
 
 router.get("/settings/:guildId/welcome", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
     const config = await prisma.welcomeConfig.findUnique({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
     });
     return res.json(config ?? {
       channelId: null,
@@ -293,18 +432,29 @@ router.get("/settings/:guildId/welcome", async (req: Request, res: Response) => 
       autoRoleId: null,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/settings/:guildId/welcome error:", error);
+    return res.status(500).json({
+      error: "Failed to load welcome settings",
+      message: "Could not load welcome settings. Please try again later.",
+    });
   }
 });
 
 router.put("/settings/:guildId/welcome", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
-    const data = req.body;
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
+    const data = req.body as any;
     const config = await prisma.welcomeConfig.upsert({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
       create: {
-        guildId: req.params.guildId,
+        guildId,
         channelId: data.channelId ?? null,
         message: data.message ?? "Welcome {user} to {server}! 👋",
         dmEnabled: data.dmEnabled ?? false,
@@ -325,15 +475,26 @@ router.put("/settings/:guildId/welcome", async (req: Request, res: Response) => 
     });
     return res.json(config);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("PUT /api/settings/:guildId/welcome error:", error);
+    return res.status(500).json({
+      error: "Failed to save welcome settings",
+      message: "Could not save welcome settings. Please try again later.",
+    });
   }
 });
 
 router.get("/settings/:guildId/tickets", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
     const config = await prisma.ticketConfig.findUnique({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
     });
     return res.json(config ?? {
       channelId: null,
@@ -342,18 +503,29 @@ router.get("/settings/:guildId/tickets", async (req: Request, res: Response) => 
       closable: true,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/settings/:guildId/tickets error:", error);
+    return res.status(500).json({
+      error: "Failed to load ticket settings",
+      message: "Could not load ticket settings. Please try again later.",
+    });
   }
 });
 
 router.put("/settings/:guildId/tickets", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
-    const data = req.body;
+    const guildId = req.params.guildId;
+    if (!guildId) {
+      return res.status(400).json({ error: "Missing server ID" });
+    }
+    const data = req.body as any;
     const config = await prisma.ticketConfig.upsert({
-      where: { guildId: req.params.guildId },
+      where: { guildId },
       create: {
-        guildId: req.params.guildId,
+        guildId,
         channelId: data.channelId ?? null,
         categoryId: data.categoryId ?? null,
         transcriptEnabled: data.transcriptEnabled ?? true,
@@ -368,7 +540,14 @@ router.put("/settings/:guildId/tickets", async (req: Request, res: Response) => 
     });
     return res.json(config);
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("PUT /api/settings/:guildId/tickets error:", error);
+    return res.status(500).json({
+      error: "Failed to save ticket settings",
+      message: "Could not save ticket settings. Please try again later.",
+    });
   }
 });
 

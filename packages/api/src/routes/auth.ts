@@ -2,13 +2,50 @@ import { Router, Request, Response } from "express";
 
 const router = Router();
 
-const CLIENT_ID = process.env.BOT_OAUTH_CLIENT_ID ?? "";
-const CLIENT_SECRET = process.env.BOT_OAUTH_CLIENT_SECRET ?? "";
-const REDIRECT_URI = process.env.BOT_OAUTH_REDIRECT_URI ?? "";
+const CLIENT_ID = process.env.BOT_OAUTH_CLIENT_ID;
+const CLIENT_SECRET = process.env.BOT_OAUTH_CLIENT_SECRET;
+const REDIRECT_URI = process.env.BOT_OAUTH_REDIRECT_URI;
 
-const DISCORD_API = "https://discord.com/api/v10";
+const OAuthErrors = {
+  notConfigured: {
+    error: "OAuth is not configured",
+    message:
+      "BOT_OAUTH_CLIENT_ID, BOT_OAUTH_CLIENT_SECRET, and BOT_OAUTH_REDIRECT_URI must be set.",
+  },
+  missingParams: {
+    error: "Missing OAuth parameters",
+    message:
+      "Discord returned an incomplete OAuth response. Please try again.",
+  },
+  stateMismatch: {
+    error: "State mismatch",
+    message:
+      "The OAuth session expired or was reused. Please reconnect again.",
+  },
+  tokenFailed: {
+    error: "Authentication failed",
+    message:
+      "Discord rejected the OAuth exchange. Please try connecting again.",
+  },
+  fetchFailed: {
+    error: "Authentication failed",
+    message: "Could not load your Discord account. Please try again.",
+  },
+  unknown: {
+    error: "Authentication failed",
+    message: "An unexpected error occurred. Please try again.",
+  },
+};
+
+function sendOAuthNotConfigured(res: Response) {
+  return res.status(500).json(OAuthErrors.notConfigured);
+}
 
 router.get("/discord", (req: Request, res: Response) => {
+  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+    return sendOAuthNotConfigured(res);
+  }
+
   const state = Math.random().toString(36).slice(2);
   (req.session as any).authState = state;
 
@@ -28,16 +65,21 @@ router.get("/callback", async (req: Request, res: Response) => {
   const state = req.query.state as string;
 
   if (!code || !state) {
-    return res.status(400).send("Missing OAuth parameters");
+    return res.status(400).json(OAuthErrors.missingParams);
   }
 
   const sessionState = (req.session as any).authState;
   if (state !== sessionState) {
-    return res.status(400).send("State mismatch");
+    return res.status(400).json(OAuthErrors.stateMismatch);
+  }
+
+  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+    console.error("OAuth callback reached without configuration");
+    return res.status(500).json(OAuthErrors.notConfigured);
   }
 
   try {
-    const tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
+    const tokenRes = await fetch(`https://discord.com/api/v10/oauth2/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -50,19 +92,30 @@ router.get("/callback", async (req: Request, res: Response) => {
     });
 
     if (!tokenRes.ok) {
-      throw new Error(`Token exchange failed: ${tokenRes.status}`);
+      const text = await tokenRes.text().catch(() => "");
+      console.error("Discord token exchange failed:", tokenRes.status, text);
+      return res.status(502).json(OAuthErrors.tokenFailed);
     }
 
     const tokens = (await tokenRes.json()) as { access_token: string };
 
     const [userRes, guildsRes] = await Promise.all([
-      fetch(`${DISCORD_API}/users/@me`, {
+      fetch(`https://discord.com/api/v10/users/@me`, {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       }),
-      fetch(`${DISCORD_API}/users/@me/guilds`, {
+      fetch(`https://discord.com/api/v10/users/@me/guilds`, {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       }),
     ]);
+
+    if (!userRes.ok || !guildsRes.ok) {
+      console.error(
+        "Discord user/guild fetch failed:",
+        userRes.status,
+        guildsRes.status,
+      );
+      return res.status(502).json(OAuthErrors.fetchFailed);
+    }
 
     const user = (await userRes.json()) as {
       id: string;
@@ -71,7 +124,10 @@ router.get("/callback", async (req: Request, res: Response) => {
       avatar?: string;
     };
 
-    const guilds = (await guildsRes.json()) as { id: string; permissions: string }[];
+    const guilds = (await guildsRes.json()) as {
+      id: string;
+      permissions: string;
+    }[];
     const MANAGE_SERVER = 1n << 5n;
     const managedGuilds = guilds
       .filter((g) => (BigInt(g.permissions) & MANAGE_SERVER) !== 0n)
@@ -84,10 +140,12 @@ router.get("/callback", async (req: Request, res: Response) => {
       guildIds: managedGuilds,
     };
 
-    return res.redirect(process.env.DASHBOARD_URL ?? "http://localhost:5173/dashboard");
+    return res.redirect(
+      process.env.DASHBOARD_URL ?? "http://localhost:5173/dashboard",
+    );
   } catch (error) {
     console.error("OAuth callback error:", error);
-    return res.status(500).send("Authentication failed");
+    return res.status(500).json(OAuthErrors.unknown);
   }
 });
 
