@@ -2,16 +2,21 @@
   "name": "aeris",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n bot,api,dashboard -c blue,green,magenta \"pnpm --filter @aeris/bot dev\" \"pnpm --filter @aeris/api dev\" \"pnpm --filter @aeris/dashboard dev\"",
-    "build": "pnpm --filter @aeris/shared build && concurrently -n bot,api,dashboard \"pnpm --filter @aeris/bot build\" \"pnpm --filter @aeris/api build\" \"pnpm --filter @aeris/dashboard build\"",
-    "build:bot": "pnpm --filter @aeris/bot build",
-    "build:api": "pnpm --filter @aeris/api build",
-    "build:dashboard": "pnpm --filter @aeris/dashboard build",
+    "dev": "concurrently -n bot,api,dashboard -c blue,green,magenta \"pnpm --filter @aeris/bot dev\" \"pnpm --filter @aeris/api dev\" \"VITE_PORT=${PORT:-5173} pnpm --filter @aeris/dashboard dev\"",
+    "build": "pnpm --filter @aeris/shared build && concurrently -n bot,api,dashboard \"pnpm --filter @aeris/bot build\" \"pnpm --filter @aeris/api build\" \"pnpm --filter @aeris/dashboard build\" && pnpm build:root",
+    "build:root": "tsc -p tsconfig.server.json",
     "db:generate": "pnpm --filter @aeris/shared db:generate",
-    "db:push": "pnpm --filter @aeris/shared db:push"
+    "db:push": "pnpm --filter @aeris/shared db:push",
+    "start": "node --import tsx/esm server.ts",
+    "start:prod": "node dist/server.js"
+  },
+  "dependencies": {
+    "dotenv-cli": "^7.2.1"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.9.0",
     "typescript": "^5.7.3"
   },
   "packageManager": "pnpm@9.15.4"
