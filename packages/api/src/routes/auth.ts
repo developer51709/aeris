@@ -43,6 +43,12 @@ function sendOAuthNotConfigured(res: Response) {
 
 router.get("/discord", (req: Request, res: Response) => {
   if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+    console.error(
+      "OAuth redirect requested but credentials are missing. CLIENT_ID:",
+      Boolean(CLIENT_ID),
+      "REDIRECT_URI:",
+      REDIRECT_URI,
+    );
     return sendOAuthNotConfigured(res);
   }
 
@@ -57,7 +63,9 @@ router.get("/discord", (req: Request, res: Response) => {
     state,
   });
 
-  res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
+  const authorizeUrl = `https://discord.com/oauth2/authorize?${params.toString()}`;
+  console.log("OAuth authorize redirect to:", authorizeUrl);
+  res.redirect(authorizeUrl);
 });
 
 router.get("/callback", async (req: Request, res: Response) => {
@@ -65,11 +73,18 @@ router.get("/callback", async (req: Request, res: Response) => {
   const state = req.query.state as string;
 
   if (!code || !state) {
+    console.error("OAuth callback missing code/state. query:", req.query);
     return res.status(400).json(OAuthErrors.missingParams);
   }
 
   const sessionState = (req.session as any).authState;
   if (state !== sessionState) {
+    console.error(
+      "OAuth callback state mismatch. session:",
+      sessionState,
+      "query:",
+      state,
+    );
     return res.status(400).json(OAuthErrors.stateMismatch);
   }
 
@@ -93,7 +108,11 @@ router.get("/callback", async (req: Request, res: Response) => {
 
     if (!tokenRes.ok) {
       const text = await tokenRes.text().catch(() => "");
-      console.error("Discord token exchange failed:", tokenRes.status, text);
+      console.error(
+        "Discord token exchange failed:",
+        tokenRes.status,
+        text.slice(0, 200),
+      );
       return res.status(502).json(OAuthErrors.tokenFailed);
     }
 
@@ -140,6 +159,12 @@ router.get("/callback", async (req: Request, res: Response) => {
       guildIds: managedGuilds,
     };
 
+    console.log(
+      "OAuth callback success:",
+      user.id,
+      "managed guilds:",
+      managedGuilds.length,
+    );
     return res.redirect(
       process.env.DASHBOARD_URL ?? "http://localhost:5173/dashboard",
     );

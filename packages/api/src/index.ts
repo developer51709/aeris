@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
 import session from "cookie-session";
@@ -36,6 +38,38 @@ app.use("/search", searchRoutes);
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const PORT = Number(process.env.API_PORT ?? 3001);
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`Aeris API listening on http://0.0.0.0:${PORT}`);
 });
+
+async function connectDatabase() {
+  try {
+    await prisma.$connect();
+    console.log("Prisma connected");
+  } catch (error) {
+    console.error("Prisma connection error:", error);
+    process.exitCode = 1;
+  }
+}
+
+connectDatabase().catch((error) => {
+  console.error("Failed to connect to database:", error);
+  process.exitCode = 1;
+});
+
+const shutdown = async (signal: string) => {
+  console.log(`Received ${signal}. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("HTTP server closed");
+  });
+  try {
+    await prisma.$disconnect();
+    console.log("Prisma disconnected");
+  } catch (error) {
+    console.error("Error disconnecting Prisma:", error);
+  }
+  process.exit(0);
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

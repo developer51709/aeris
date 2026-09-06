@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import { Client, GatewayIntentBits, Partials, Events } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { registerCommands } from "./commands/registry.js";
@@ -39,4 +41,10 @@ main().catch((error) => {
 
 process.on("unhandledRejection", (error) => {
   console.error("Unhandled promise rejection:", error);
+  process.exit(1);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+  process.exit(1);
 });
