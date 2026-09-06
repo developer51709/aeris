@@ -7,6 +7,9 @@ import { DocsPage } from "./pages/docs";
 import { AuthPage } from "./pages/auth";
 import { api } from "./lib/api";
 
+const VITE_API_URL =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ?? "/api";
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +30,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
+  useEffect(() => {
+    if (!session && typeof window !== "undefined") {
+      window.localStorage?.removeItem("aeris-theme");
+    }
+  }, [session]);
+
   if (loading)
     return (
       <Layout>
@@ -46,7 +55,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
               href="/auth"
               className="mt-4 inline-flex items-center justify-center rounded-xl bg-brand text-white px-5 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-all"
             >
-              Go to sign-in
+              Try to sign in
             </a>
           </div>
         </div>
@@ -75,3 +84,5 @@ export default function App() {
     </Routes>
   );
 }
+
+export { VITE_API_URL };

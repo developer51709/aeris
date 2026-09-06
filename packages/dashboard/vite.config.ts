@@ -14,8 +14,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: Number(process.env.VITE_PORT ?? process.env.PORT ?? 5173),
     strictPort: true,
     host: "0.0.0.0",
+    watch: {
+      ignored: ["**/dist/**", "**/node_modules/**"],
+    },
   },
 });
