@@ -3,10 +3,14 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import session from "cookie-session";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { prisma } from "@aeris/shared";
 import { authRoutes } from "./routes/auth.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { searchRoutes } from "./routes/search.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
@@ -19,6 +23,20 @@ app.use(
 );
 
 app.use(express.json());
+
+// Lightweight cookie parser (no extra dependency)
+app.use((req, _res, next) => {
+  const header = req.headers.cookie;
+  if (header) {
+    const cookies: Record<string, string> = {};
+    for (const pair of header.split(";")) {
+      const [key, ...rest] = pair.split("=");
+      if (key) cookies[key.trim()] = rest.join("=").trim();
+    }
+    (req as any).cookies = cookies;
+  }
+  next();
+});
 
 app.use(
   session({
@@ -36,6 +54,17 @@ app.use("/api", dashboardRoutes);
 app.use("/search", searchRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Serve the dashboard build in production
+const dashboardDist = path.resolve(__dirname, "../../dashboard/dist");
+app.use(express.static(dashboardDist));
+app.get("*", (req, res, next) => {
+  // Only serve index.html for non-API routes
+  if (req.path.startsWith("/auth") || req.path.startsWith("/api") || req.path.startsWith("/search") || req.path === "/health") {
+    return next();
+  }
+  res.sendFile(path.join(dashboardDist, "index.html"));
+});
 
 const PORT = Number(process.env.API_PORT ?? 3001);
 const server = app.listen(PORT, "0.0.0.0", () => {

@@ -154,3 +154,14 @@ model EconomyShopItem {
 
   @@unique([guildId, id])
 }
+
+model LoginSession {
+  id           String   @id
+  userId       String
+  token        String   @unique
+  username     String?
+  avatar       String?
+  guildIds     String   @default("[]")
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}

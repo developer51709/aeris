@@ -1,6 +1,11 @@
 import { Router, Request, Response } from "express";
+import { prisma } from "@aeris/shared";
+import crypto from "node:crypto";
 
 const router = Router();
+
+const SESSION_COOKIE = "aeris.login";
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const CLIENT_ID = process.env.BOT_OAUTH_CLIENT_ID;
 const CLIENT_SECRET = process.env.BOT_OAUTH_CLIENT_SECRET;
@@ -159,30 +164,105 @@ router.get("/callback", async (req: Request, res: Response) => {
       guildIds: managedGuilds,
     };
 
+    // Persist session to database for long-lived login
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + SESSION_MAX_AGE);
+    try {
+      await prisma.loginSession.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          token,
+          username: user.global_name ?? user.username,
+          avatar: user.avatar,
+          guildIds: JSON.stringify(managedGuilds),
+          expiresAt,
+        },
+        update: {
+          token,
+          username: user.global_name ?? user.username,
+          avatar: user.avatar,
+          guildIds: JSON.stringify(managedGuilds),
+          expiresAt,
+        },
+      });
+      res.cookie(SESSION_COOKIE, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: SESSION_MAX_AGE,
+        path: "/",
+      });
+    } catch (e) {
+      console.error("Failed to persist login session:", e);
+    }
+
     console.log(
       "OAuth callback success:",
       user.id,
       "managed guilds:",
       managedGuilds.length,
     );
-    return res.redirect(
-      process.env.DASHBOARD_URL ?? "http://localhost:5173/dashboard",
-    );
+    const baseUrl = process.env.DASHBOARD_URL ?? "";
+    // If DASHBOARD_URL is set but doesn't end with /dashboard, append it.
+    // If not set at all, use a relative path (works when API and dashboard
+    // are on the same origin in production).
+    const redirectUrl = baseUrl
+      ? baseUrl.endsWith("/dashboard")
+        ? baseUrl
+        : `${baseUrl.replace(/\/$/, "/")}dashboard`
+      : "/dashboard";
+    return res.redirect(redirectUrl);
   } catch (error) {
     console.error("OAuth callback error:", error);
     return res.status(500).json(OAuthErrors.unknown);
   }
 });
 
-router.get("/me", (req: Request, res: Response) => {
-  const user = (req.session as any).user;
-  if (!user) {
-    return res.status(401).json({ error: "Not authenticated" });
+router.get("/me", async (req: Request, res: Response) => {
+  // Try cookie-session first
+  const user = (req.session as any)?.user;
+  if (user && typeof user.id === "string") {
+    return res.json(user);
   }
-  return res.json(user);
+
+  // Fallback: restore from persistent login token
+  const token = req.cookies?.[SESSION_COOKIE];
+  if (token) {
+    try {
+      const session = await prisma.loginSession.findUnique({ where: { token } });
+      if (session && session.expiresAt > new Date()) {
+        const restored = {
+          id: session.userId,
+          username: session.username,
+          avatar: session.avatar,
+          guildIds: JSON.parse(session.guildIds || "[]"),
+        };
+        // Rehydrate cookie-session
+        (req.session as any).user = restored;
+        return res.json(restored);
+      }
+      // Expired — clean up
+      if (session) {
+        await prisma.loginSession.delete({ where: { token } }).catch(() => {});
+      }
+    } catch (e) {
+      console.error("Persistent session restore failed:", e);
+    }
+  }
+
+  return res.status(401).json({ error: "Not authenticated" });
 });
 
-router.post("/logout", (req: Request, res: Response) => {
+router.post("/logout", async (req: Request, res: Response) => {
+  // Clear persistent session
+  const token = req.cookies?.[SESSION_COOKIE];
+  if (token) {
+    try {
+      await prisma.loginSession.delete({ where: { token } }).catch(() => {});
+    } catch (e) { /* ignore */ }
+  }
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
   req.session = null as any;
   return res.json({ ok: true });
 });
