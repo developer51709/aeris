@@ -3,12 +3,12 @@ import { prisma } from "@aeris/shared";
 
 const router = Router();
 
-function requireAuth(req: Request): { id: string; username: string; avatar?: string | null; guildIds: string[] } {
+function requireAuth(req: Request): { id: string; username: string; avatar?: string | null; guildIds: string[]; accessToken?: string } {
   const user = (req.session as any)?.user;
   if (!user || typeof user?.id !== "string") {
     throw new Error("Unauthorized");
   }
-  return user as { id: string; username: string; avatar?: string | null; guildIds: string[] };
+  return user as { id: string; username: string; avatar?: string | null; guildIds: string[]; accessToken?: string };
 }
 
 function requireGuildAccess(req: Request, guildId: string | undefined) {
@@ -21,21 +21,67 @@ function requireGuildAccess(req: Request, guildId: string | undefined) {
 
 router.get("/guilds", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    const user = requireAuth(req);
     const userManagedGuilds = (req.session as any)?.user?.guildIds ?? [];
     if (!Array.isArray(userManagedGuilds) || userManagedGuilds.length === 0) {
       return res.json([]);
     }
 
-    const guilds = await prisma.guild.findMany({
+    const knownGuilds = await prisma.guild.findMany({
       where: {
         id: { in: userManagedGuilds },
-        name: { not: null },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return res.json(guilds);
+    // Find guilds the user manages but that aren't in the database yet
+    const knownIds = new Set(knownGuilds.map((g: { id: string }) => g.id));
+    const missingIds = userManagedGuilds.filter((id: string) => !knownIds.has(id));
+
+    let missingGuilds: { id: string; name: string | null; icon: string | null; memberCount: number }[] = [];
+
+    if (missingIds.length > 0 && user.accessToken) {
+      // Fetch guild info from Discord for guilds not yet in the database
+      try {
+        const discordGuildsRes = await fetch("https://discord.com/api/v10/users/@me/guilds", {
+          headers: { Authorization: `Bearer ${user.accessToken}` },
+        });
+        if (discordGuildsRes.ok) {
+          const discordGuilds = (await discordGuildsRes.json()) as {
+            id: string;
+            name: string;
+            icon: string | null;
+          }[];
+          const discordMap = new Map(discordGuilds.map((g) => [g.id, g]));
+          missingGuilds = missingIds.map((id: string) => {
+            const info = discordMap.get(id);
+            return {
+              id,
+              name: info?.name ?? null,
+              icon: info?.icon ?? null,
+              memberCount: 0,
+            };
+          });
+        }
+      } catch (e) {
+        // If Discord fetch fails, return guilds with just IDs
+        missingGuilds = missingIds.map((id: string) => ({
+          id,
+          name: null,
+          icon: null,
+          memberCount: 0,
+        }));
+      }
+    } else {
+      missingGuilds = missingIds.map((id: string) => ({
+        id,
+        name: null,
+        icon: null,
+        memberCount: 0,
+      }));
+    }
+
+    return res.json([...knownGuilds, ...missingGuilds]);
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return res.status(401).json({ error: "Not authenticated" });

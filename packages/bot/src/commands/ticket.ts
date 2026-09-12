@@ -7,6 +7,7 @@ import {
   ButtonStyle,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { successEmbed, aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -33,6 +34,11 @@ export default {
         update: { categoryId: category?.id ?? null },
       });
 
+      const panelEmbed = aerisEmbed()
+        .setColor(COLORS.primary)
+        .setTitle("🎫 Support Tickets")
+        .setDescription("Need help? Click below to open a private ticket with our staff team.");
+
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId("ticket_open")
@@ -44,16 +50,22 @@ export default {
       const panelChannel = interaction.channel;
       if (panelChannel && "send" in panelChannel) {
         await (panelChannel as { send: (opts: unknown) => Promise<unknown> }).send({
-          content: "**🎫 Support Tickets**\nNeed help? Click below to open a private ticket with our staff team.",
+          embeds: [panelEmbed],
           components: [row],
         });
       }
-      await interaction.reply({ content: "✅ Ticket panel created.", ephemeral: true });
+
+      const embed = successEmbed("Ticket Panel Created", "The ticket panel has been set up in this channel.");
+      await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
 
     if (subcommand === "close") {
-      await interaction.reply({ content: "🔒 Closing ticket…", ephemeral: true });
+      const embed = aerisEmbed()
+        .setColor(COLORS.warning)
+        .setTitle("🔒 Closing Ticket")
+        .setDescription("This ticket is being closed…");
+      await interaction.reply({ embeds: [embed], ephemeral: true });
       await interaction.channel?.delete().catch(() => undefined);
     }
   },

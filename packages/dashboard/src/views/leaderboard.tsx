@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
-import { RefreshCw, Trophy } from "lucide-react";
-
-interface Guild {
-  id: string;
-  name?: string | null;
-}
+import { RefreshCw, Trophy, ArrowLeft } from "lucide-react";
 
 interface Entry {
   rank: number;
@@ -15,32 +11,13 @@ interface Entry {
 }
 
 export function Leaderboard() {
-  const [guilds, setGuilds] = useState<Guild[]>([]);
-  const [guildId, setGuildId] = useState("");
+  const { guildId } = useParams<{ guildId: string }>();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .get("/guilds")
-      .then((data) => {
-        const nextGuilds = Array.isArray(data) ? (data as Guild[]) : [];
-        setGuilds(nextGuilds);
-        setGuildId(nextGuilds[0]?.id ?? "");
-      })
-      .catch((cause) => {
-        setError(cause instanceof ApiError ? cause.message : "Could not load your servers.");
-        setLoading(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!guildId) {
-      setEntries([]);
-      setLoading(false);
-      return;
-    }
+    if (!guildId) return;
     setLoading(true);
     setError(null);
     api
@@ -57,24 +34,15 @@ export function Leaderboard() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-brand">Community progress</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Leaderboard</h1>
+          <Link
+            to="/dashboard/guilds"
+            className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-brand transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Servers
+          </Link>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Leaderboard</h1>
           <p className="mt-1 text-sm text-text-secondary">Top members by XP earned</p>
         </div>
-        {guilds.length > 0 && (
-          <select
-            value={guildId}
-            onChange={(event) => setGuildId(event.target.value)}
-            aria-label="Choose a server"
-            className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm font-medium outline-none focus:border-brand"
-          >
-            {guilds.map((guild) => (
-              <option key={guild.id} value={guild.id}>
-                {guild.name ?? guild.id}
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       <div className="mt-6 max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface-2">

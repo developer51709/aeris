@@ -3,13 +3,11 @@ import { useEffect, useState } from "react";
 import {
   BookOpen,
   LayoutDashboard,
-  ListOrdered,
   LogOut,
   Menu,
   Moon,
   Settings,
   Sun,
-  Wallet,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { authApi } from "../lib/api";
@@ -48,11 +46,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     window.localStorage?.setItem("aeris-theme", next);
   }
 
-  const links: { to: string; icon: typeof Settings; label: string }[] = [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/dashboard/leaderboard", icon: ListOrdered, label: "Leaderboard" },
-    { to: "/dashboard/economy", icon: Wallet, label: "Economy" },
-    { to: "/dashboard/settings", icon: Settings, label: "Settings" },
+  const links: { to: string; icon: typeof Settings; label: string; end?: boolean }[] = [
+    { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
+    { to: "/dashboard/guilds", icon: Settings, label: "Servers" },
     { to: "/docs", icon: BookOpen, label: "Docs" },
   ];
 
@@ -84,7 +80,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <NavLink
                 key={link.to}
                 to={link.to}
-                end={link.to === "/dashboard"}
+                end={link.end}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -139,7 +135,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <NavLink
                 key={link.to}
                 to={link.to}
-                end={link.to === "/dashboard"}
+                end={link.end}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",

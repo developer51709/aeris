@@ -4,6 +4,7 @@ import {
   PermissionFlagsBits,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -42,19 +43,43 @@ export default {
       await prisma.moderationLog.create({
         data: { id: `${guildId}:${Date.now()}`, guildId, userId: user.id, action: "ban", reason, moderatorId: interaction.user.id },
       });
-      await interaction.reply({ content: `🔨 Banned **${user.username}** — ${reason}` });
+      const embed = aerisEmbed()
+        .setColor(COLORS.danger)
+        .setTitle("🔨 User Banned")
+        .addFields(
+          { name: "User", value: `${user} (${user.id})`, inline: true },
+          { name: "Moderator", value: `${interaction.user}`, inline: true },
+          { name: "Reason", value: reason, inline: false },
+        );
+      await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "kick") {
       const member = await interaction.guild?.members.fetch(user.id).catch(() => undefined);
       await member?.kick(reason);
       await prisma.moderationLog.create({
         data: { id: `${guildId}:${Date.now()}`, guildId, userId: user.id, action: "kick", reason, moderatorId: interaction.user.id },
       });
-      await interaction.reply({ content: `👢 Kicked **${user.username}** — ${reason}` });
+      const embed = aerisEmbed()
+        .setColor(COLORS.warning)
+        .setTitle("👢 User Kicked")
+        .addFields(
+          { name: "User", value: `${user} (${user.id})`, inline: true },
+          { name: "Moderator", value: `${interaction.user}`, inline: true },
+          { name: "Reason", value: reason, inline: false },
+        );
+      await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "warn") {
       await prisma.moderationLog.create({
         data: { id: `${guildId}:${Date.now()}`, guildId, userId: user.id, action: "warn", reason, moderatorId: interaction.user.id },
       });
-      await interaction.reply({ content: `⚠️ Warned **${user.username}** — ${reason}` });
+      const embed = aerisEmbed()
+        .setColor(COLORS.warning)
+        .setTitle("⚠️ User Warned")
+        .addFields(
+          { name: "User", value: `${user} (${user.id})`, inline: true },
+          { name: "Moderator", value: `${interaction.user}`, inline: true },
+          { name: "Reason", value: reason, inline: false },
+        );
+      await interaction.reply({ embeds: [embed] });
     }
   },
 };

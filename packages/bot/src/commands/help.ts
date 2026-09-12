@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
-const MODULES = [
+const MODULES: [string, string][] = [
   ["🛡️ Automod", "Word filters, link filters, spam & raid protection"],
   ["📈 Leveling", "XP tracking, level-up cards, role rewards, leaderboards"],
   ["💰 Economy", "Currency, daily rewards, work, shop, blackjack"],
@@ -14,15 +15,14 @@ const MODULES = [
 export default {
   data: new SlashCommandBuilder().setName("help").setDescription("Learn what Aeris can do"),
   async execute(interaction: ChatInputCommandInteraction) {
-    const lines = MODULES.map(([icon, desc]) => `${icon} — ${desc}`);
-    await interaction.reply({
-      content: [
-        "**✨ Aeris — Feature Overview**",
-        "",
-        ...lines,
-        "",
-        "📖 Full documentation: https://aeris.example/docs",
-      ].join("\n"),
-    });
+    const embed = aerisEmbed()
+      .setColor(COLORS.primary)
+      .setTitle("✨ Aeris — Feature Overview")
+      .setDescription(
+        MODULES.map(([icon, desc]) => `${icon} — ${desc}`).join("\n"),
+      )
+      .setURL("https://aeris.example/docs");
+
+    await interaction.reply({ embeds: [embed] });
   },
 };

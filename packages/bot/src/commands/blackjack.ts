@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
 type Card = { rank: string; suit: string };
 
@@ -57,7 +58,11 @@ export default {
     });
 
     if (wallet.cash < bet) {
-      await interaction.reply({ content: "❌ Insufficient funds for that bet." });
+      const embed = aerisEmbed()
+        .setColor(COLORS.danger)
+        .setTitle("Insufficient Funds")
+        .setDescription("You don't have enough coins for that bet.");
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -73,24 +78,31 @@ export default {
     });
 
     let outcome: string;
+    let color: number;
     let delta = 0;
 
     if (playerTotal === 21) {
       delta = Math.floor(bet * 2.5);
       outcome = "🎉 **Blackjack!** You win 2.5× your bet!";
+      color = COLORS.economy;
     } else if (playerTotal > 21) {
       outcome = "💥 **Bust!** You lose.";
+      color = COLORS.danger;
     } else if (dealerTotal > 21) {
       delta = bet * 2;
       outcome = "🏆 **Dealer busts!** You win 2× your bet!";
+      color = COLORS.success;
     } else if (playerTotal > dealerTotal) {
       delta = bet * 2;
       outcome = "🏆 **You win!** 2× your bet.";
+      color = COLORS.success;
     } else if (playerTotal === dealerTotal) {
       delta = bet;
       outcome = "🤝 **Push.** Bet returned.";
+      color = COLORS.warning;
     } else {
       outcome = "😢 **Dealer wins.** You lose.";
+      color = COLORS.danger;
     }
 
     if (delta > 0) {
@@ -100,16 +112,17 @@ export default {
       });
     }
 
-    await interaction.reply({
-      content: [
-        "**🃏 Blackjack**",
-        "",
-        `**Your hand** (${playerTotal}): ${fmt(playerHand)}`,
-        `**Dealer's hand** (${dealerTotal}): ${fmt(dealerHand)}`,
-        "",
-        outcome,
-        `Bet: **${bet}** coins`,
-      ].join("\n"),
-    });
+    const embed = aerisEmbed()
+      .setColor(color)
+      .setTitle("🃏 Blackjack")
+      .addFields(
+        { name: `Your Hand (${playerTotal})`, value: fmt(playerHand), inline: true },
+        { name: `Dealer (${dealerTotal})`, value: fmt(dealerHand), inline: true },
+        { name: "Result", value: outcome, inline: false },
+        { name: "Bet", value: `${bet.toLocaleString()} coins`, inline: true },
+        { name: "Payout", value: delta > 0 ? `+${delta.toLocaleString()}` : `${-bet}`, inline: true },
+      );
+
+    await interaction.reply({ embeds: [embed] });
   },
 };

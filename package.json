@@ -7,7 +7,7 @@
     "build:root": "tsc -p tsconfig.server.json",
     "db:generate": "pnpm --filter @aeris/shared db:generate",
     "db:push": "pnpm --filter @aeris/shared db:push",
-    "start": "node --import tsx/esm server.ts",
+    "start": "tsx server.ts",
     "start:prod": "node dist/server.js"
   },
   "dependencies": {

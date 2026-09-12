@@ -1,12 +1,9 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS, successEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -117,18 +114,22 @@ async function handleStatus(
     .automodSettings.findUnique({ where: { guildId } })
     .catch(() => undefined);
 
-  const content = [
-    `**Automod Status** — ${interaction.guild?.name}`,
-    ``,
-    `Word Filter: ${settings?.wordFilters ? "Enabled" : "Disabled"}`,
-    `Link Filter: ${settings?.linkFilters ? "Enabled" : "Disabled"}`,
-    `Spam Detection: ${settings?.spamEnabled ? "Enabled" : "Disabled"}`,
-    `Raid Protection: ${settings?.raidEnabled ? "Enabled" : "Disabled"}`,
-    `Max Links per Message: ${settings?.maxLinks ?? 5}`,
-    `Max Emotes per Message: ${settings?.maxEmotes ?? 10}`,
-  ].join("\n");
+  const enabled = (val: boolean | undefined) => val ? "✅ Enabled" : "❌ Disabled";
 
-  await interaction.reply({ content, components: [] });
+  const embed = aerisEmbed()
+    .setColor(COLORS.primary)
+    .setTitle(`🛡️ Automod Status`)
+    .setDescription(interaction.guild?.name ?? "")
+    .addFields(
+      { name: "Word Filter", value: enabled(settings?.wordFilters ? JSON.parse(settings.wordFilters).length > 0 : false), inline: true },
+      { name: "Link Filter", value: enabled(settings?.linkFilters ? JSON.parse(settings.linkFilters).length > 0 : false), inline: true },
+      { name: "Spam Detection", value: enabled(settings?.spamEnabled), inline: true },
+      { name: "Raid Protection", value: enabled(settings?.raidEnabled), inline: true },
+      { name: "Max Links", value: String(settings?.maxLinks ?? 5), inline: true },
+      { name: "Max Emotes", value: String(settings?.maxEmotes ?? 10), inline: true },
+    );
+
+  await interaction.reply({ embeds: [embed] });
 }
 
 async function handleEnable(
@@ -164,10 +165,12 @@ async function handleEnable(
     },
   });
 
-  await interaction.reply({
-    content: "Automod settings updated successfully.",
-    components: [],
-  });
+  const embed = successEmbed(
+    "Automod Updated",
+    "Automod settings have been saved.",
+  );
+
+  await interaction.reply({ embeds: [embed] });
 }
 
 async function handleWordFilter(
@@ -190,20 +193,22 @@ async function handleWordFilter(
       where: { guildId },
       data: { wordFilters: JSON.stringify(list) },
     });
-    await interaction.reply({
-      content: `Added word filter: **${word}**`,
-      components: [],
-    });
+    const embed = successEmbed(
+      "Word Filter Added",
+      `Added **${word}** to the word filter list.`,
+    );
+    await interaction.reply({ embeds: [embed] });
   } else {
     const next = list.filter((w) => w !== word);
     await prisma.automodSettings.update({
       where: { guildId },
       data: { wordFilters: JSON.stringify(next) },
     });
-    await interaction.reply({
-      content: `Removed word filter: **${word}**`,
-      components: [],
-    });
+    const embed = successEmbed(
+      "Word Filter Removed",
+      `Removed **${word}** from the word filter list.`,
+    );
+    await interaction.reply({ embeds: [embed] });
   }
 }
 
@@ -227,19 +232,21 @@ async function handleLinkFilter(
       where: { guildId },
       data: { linkFilters: JSON.stringify(list) },
     });
-    await interaction.reply({
-      content: `Added link filter for domain: **${domain}**`,
-      components: [],
-    });
+    const embed = successEmbed(
+      "Link Filter Added",
+      `Added **${domain}** to the link filter list.`,
+    );
+    await interaction.reply({ embeds: [embed] });
   } else {
     const next = list.filter((d) => d !== domain);
     await prisma.automodSettings.update({
       where: { guildId },
       data: { linkFilters: JSON.stringify(next) },
     });
-    await interaction.reply({
-      content: `Removed link filter for domain: **${domain}**`,
-      components: [],
-    });
+    const embed = successEmbed(
+      "Link Filter Removed",
+      `Removed **${domain}** from the link filter list.`,
+    );
+    await interaction.reply({ embeds: [embed] });
   }
 }

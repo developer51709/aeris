@@ -5,6 +5,7 @@ import {
   ChannelType,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { successEmbed, aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -43,11 +44,19 @@ export default {
     if (subcommand === "channel") {
       const channel = interaction.options.getChannel("channel")!;
       await prisma.welcomeConfig.update({ where: { guildId }, data: { channelId: channel.id } });
-      await interaction.reply({ content: `✅ Welcome channel set to ${channel}.` });
+      const embed = successEmbed(
+        "Welcome Channel Set",
+        `Welcome messages will now be sent to ${channel}.`,
+      );
+      await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "message") {
       const text = interaction.options.getString("text")!;
       await prisma.welcomeConfig.update({ where: { guildId }, data: { message: text } });
-      await interaction.reply({ content: "✅ Welcome message updated." });
+      const embed = successEmbed(
+        "Welcome Message Updated",
+        `New welcome message:\n\n${text}`,
+      );
+      await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "dm") {
       const enabled = interaction.options.getBoolean("enabled")!;
       const text = interaction.options.getString("text");
@@ -55,7 +64,11 @@ export default {
         where: { guildId },
         data: { dmEnabled: enabled, ...(text ? { dmMessage: text } : {}) },
       });
-      await interaction.reply({ content: `✅ Welcome DMs ${enabled ? "enabled" : "disabled"}.` });
+      const embed = successEmbed(
+        `Welcome DMs ${enabled ? "Enabled" : "Disabled"}`,
+        enabled ? "New members will receive a DM on join." : "DMs have been turned off.",
+      );
+      await interaction.reply({ embeds: [embed] });
     }
   },
 };

@@ -1,9 +1,9 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -23,27 +23,21 @@ export default {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === "info") {
-      const info = {
-        name: "Aeris",
-        description: "Feature-rich Discord bot with automod, leveling, economy, music, tickets, and more.",
-        library: "discord.js",
-        shards: 1,
-        invite: `https://discord.com/oauth2/authorize?client_id=${process.env.BOT_OAUTH_CLIENT_ID}&permissions=8&scope=bot%20applications.commands`,
-        docs: "https://aeris.example/docs",
-      };
+      const invite = `https://discord.com/oauth2/authorize?client_id=${process.env.BOT_OAUTH_CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
-      await interaction.reply({
-        content: [
-          `**${info.name}**`,
-          `Version: 0.1.0`,
-          `Libraries: ${info.library}`,
-          `Shards: ${info.shards}`,
-          `Permissions: Administrator (for full feature set)`,
-          `Invite: ${info.invite}`,
-          `Docs: ${info.docs}`,
-        ].join("\n"),
-        components: [],
-      });
+      const embed = aerisEmbed()
+        .setColor(COLORS.primary)
+        .setTitle("🤖 Aeris")
+        .setDescription("Feature-rich Discord bot with automod, leveling, economy, music, tickets, and more.")
+        .addFields(
+          { name: "Version", value: "0.1.0", inline: true },
+          { name: "Library", value: "discord.js", inline: true },
+          { name: "Shards", value: "1", inline: true },
+          { name: "Permissions", value: "Administrator (full feature set)", inline: false },
+        )
+        .setURL(invite);
+
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -53,16 +47,22 @@ export default {
         (acc, guild) => acc + guild.memberCount,
         0,
       );
+      const uptime = process.uptime() | 0;
+      const hours = Math.floor(uptime / 3600);
+      const minutes = Math.floor((uptime % 3600) / 60);
+      const seconds = uptime % 60;
+      const uptimeStr = `${hours}h ${minutes}m ${seconds}s`;
 
-      await interaction.reply({
-        content: [
-          `**Bot Stats**`,
-          `• Guilds: ${guildCount}`,
-          `• Members: ${memberCount}`,
-          `• Uptime: ${process.uptime() | 0}s`,
-        ].join("\n"),
-        components: [],
-      });
+      const embed = aerisEmbed()
+        .setColor(COLORS.primary)
+        .setTitle("📊 Bot Stats")
+        .addFields(
+          { name: "Guilds", value: guildCount.toLocaleString(), inline: true },
+          { name: "Members", value: memberCount.toLocaleString(), inline: true },
+          { name: "Uptime", value: uptimeStr, inline: true },
+        );
+
+      await interaction.reply({ embeds: [embed] });
     }
   },
-}
+};

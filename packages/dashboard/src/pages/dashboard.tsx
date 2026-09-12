@@ -1,5 +1,6 @@
-import { Route, Routes } from "react-router-dom";
-import { Overview } from "../views/overview";
+import { Route, Routes, Navigate } from "react-router-dom";
+import { UserProfile } from "../views/userProfile";
+import { GuildList } from "../views/guildList";
 import { GuildSettings } from "../views/guildSettings";
 import { Leaderboard } from "../views/leaderboard";
 import { Economy } from "../views/economy";
@@ -7,11 +8,13 @@ import { Economy } from "../views/economy";
 export function DashboardPage() {
   return (
     <Routes>
-      <Route path="/" element={<Overview />} />
-      <Route path="settings" element={<GuildSettings />} />
-      <Route path="leaderboard" element={<Leaderboard />} />
-      <Route path="economy" element={<Economy />} />
-      <Route path="*" element={<Overview />} />
+      <Route path="/" element={<UserProfile />} />
+      <Route path="/guilds" element={<GuildList />} />
+      <Route path="/guilds/:guildId" element={<Navigate to="settings" replace />} />
+      <Route path="/guilds/:guildId/settings" element={<GuildSettings />} />
+      <Route path="/guilds/:guildId/leaderboard" element={<Leaderboard />} />
+      <Route path="/guilds/:guildId/economy" element={<Economy />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

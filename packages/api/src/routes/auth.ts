@@ -192,6 +192,7 @@ router.get("/callback", async (req: Request, res: Response) => {
       username: user.global_name ?? user.username,
       avatar: user.avatar,
       guildIds: managedGuilds,
+      accessToken: tokens.access_token,
     };
 
     // Persist session to database for long-lived login
@@ -258,6 +259,7 @@ router.get("/me", async (req: Request, res: Response) => {
           username: session.username,
           avatar: session.avatar,
           guildIds: JSON.parse(session.guildIds || "[]"),
+          accessToken: undefined,
         };
         // Rehydrate cookie-session
         (req.session as any).user = restored;

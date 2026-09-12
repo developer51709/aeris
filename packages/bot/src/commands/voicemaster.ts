@@ -3,6 +3,7 @@ import {
   ChatInputCommandInteraction,
   ChannelType,
 } from "discord.js";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -25,7 +26,11 @@ export default {
     const channel = member?.voice.channel;
 
     if (!channel || channel.type !== ChannelType.GuildVoice) {
-      await interaction.reply({ content: "❌ Join a voice channel first.", ephemeral: true });
+      const embed = aerisEmbed()
+        .setColor(COLORS.danger)
+        .setTitle("Not in Voice")
+        .setDescription("Join a voice channel first.");
+      await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
 
@@ -33,20 +38,32 @@ export default {
     switch (subcommand) {
       case "lock":
         await channel.permissionOverwrites.edit(interaction.guild!.roles.everyone, { Connect: false });
-        await interaction.reply({ content: "🔒 Channel locked." });
+        await interaction.reply({
+          embeds: [aerisEmbed().setColor(COLORS.warning).setTitle("🔒 Channel Locked").setDescription(`${channel} has been locked.`)],
+        });
         break;
       case "unlock":
         await channel.permissionOverwrites.edit(interaction.guild!.roles.everyone, { Connect: null });
-        await interaction.reply({ content: "🔓 Channel unlocked." });
+        await interaction.reply({
+          embeds: [aerisEmbed().setColor(COLORS.success).setTitle("🔓 Channel Unlocked").setDescription(`${channel} has been unlocked.`)],
+        });
         break;
-      case "limit":
-        await channel.setUserLimit(interaction.options.getInteger("count")!);
-        await interaction.reply({ content: `👥 User limit set to **${interaction.options.getInteger("count")}**.` });
+      case "limit": {
+        const count = interaction.options.getInteger("count")!;
+        await channel.setUserLimit(count);
+        await interaction.reply({
+          embeds: [aerisEmbed().setColor(COLORS.primary).setTitle("👥 User Limit Set").setDescription(`Maximum users set to **${count}**.`)],
+        });
         break;
-      case "name":
-        await channel.setName(interaction.options.getString("name")!);
-        await interaction.reply({ content: "✏️ Channel renamed." });
+      }
+      case "name": {
+        const newName = interaction.options.getString("name")!;
+        await channel.setName(newName);
+        await interaction.reply({
+          embeds: [aerisEmbed().setColor(COLORS.primary).setTitle("✏️ Channel Renamed").setDescription(`Channel renamed to **${newName}**.`)],
+        });
         break;
+      }
     }
   },
 };

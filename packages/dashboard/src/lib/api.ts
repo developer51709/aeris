@@ -1,7 +1,7 @@
 const API_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ?? "/api";
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "/api";
 const AUTH_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_AUTH_URL) ??
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_AUTH_URL) ||
   (API_BASE.endsWith("/api") ? `${API_BASE.slice(0, -4)}/auth` : "/auth");
 
 export class ApiError extends Error {

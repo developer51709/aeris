@@ -3,6 +3,7 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -24,21 +25,37 @@ export default {
     switch (subcommand) {
       case "play": {
         const query = interaction.options.getString("query")!;
-        await interaction.reply({
-          content: `🎵 Added **${query}** to the queue. (Playback requires a voice connection — see /music queue)`,
-        });
+        const embed = aerisEmbed()
+          .setColor(COLORS.music)
+          .setTitle("🎵 Added to Queue")
+          .setDescription(`**${query}** has been added to the queue.\n\n*Playback requires a voice connection.*`);
+        await interaction.reply({ embeds: [embed] });
         break;
       }
-      case "skip":
-        await interaction.reply({ content: "⏭️ Skipped the current song." });
+      case "skip": {
+        const embed = aerisEmbed()
+          .setColor(COLORS.music)
+          .setTitle("⏭️ Skipped")
+          .setDescription("Skipped the current song.");
+        await interaction.reply({ embeds: [embed] });
         break;
-      case "stop":
-        await interaction.reply({ content: "⏹️ Stopped playback and cleared the queue." });
+      }
+      case "stop": {
+        const embed = aerisEmbed()
+          .setColor(COLORS.music)
+          .setTitle("⏹️ Stopped")
+          .setDescription("Playback stopped and queue cleared.");
+        await interaction.reply({ embeds: [embed] });
         break;
+      }
       case "queue": {
         const q = await prisma.musicQueue.findUnique({ where: { guildId } });
         if (!q || !q.nowPlaying) {
-          await interaction.reply({ content: "The queue is empty." });
+          const embed = aerisEmbed()
+            .setColor(COLORS.neutral)
+            .setTitle("🎵 Queue")
+            .setDescription("The queue is empty.");
+          await interaction.reply({ embeds: [embed] });
           return;
         }
         const items: string[] = JSON.parse(q.queue ?? "[]");
@@ -49,7 +66,11 @@ export default {
             ? items.slice(0, 10).map((t, i) => `**${i + 1}.** ${t}`)
             : ["*Queue is empty.*"]),
         ];
-        await interaction.reply({ content: lines.join("\n") });
+        const embed = aerisEmbed()
+          .setColor(COLORS.music)
+          .setTitle("🎵 Music Queue")
+          .setDescription(lines.join("\n"));
+        await interaction.reply({ embeds: [embed] });
         break;
       }
     }

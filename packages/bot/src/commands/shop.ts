@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS, successEmbed, errorEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,11 +23,22 @@ export default {
     if (subcommand === "list") {
       const items = await prisma.economyShopItem.findMany({ where: { guildId } });
       if (items.length === 0) {
-        await interaction.reply({ content: "The shop is empty. Server admins can add items from the dashboard." });
+        const embed = aerisEmbed()
+          .setColor(COLORS.neutral)
+          .setTitle("🛒 Shop")
+          .setDescription("The shop is empty. Server admins can add items from the dashboard.");
+        await interaction.reply({ embeds: [embed] });
         return;
       }
-      const lines = items.map((i: { name: string; price: number; description?: string | null }) => `• **${i.name}** — ${i.price} coins ${i.description ? `— ${i.description}` : ""}`);
-      await interaction.reply({ content: [`**🛒 Shop**`, "", ...lines].join("\n") });
+      const lines = items.map(
+        (i: { name: string; price: number; description?: string | null }) =>
+          `• **${i.name}** — ${i.price.toLocaleString()} coins${i.description ? ` — ${i.description}` : ""}`,
+      );
+      const embed = aerisEmbed()
+        .setColor(COLORS.economy)
+        .setTitle("🛒 Shop")
+        .setDescription(lines.join("\n"));
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -34,7 +46,7 @@ export default {
       const name = interaction.options.getString("item")!;
       const item = await prisma.economyShopItem.findFirst({ where: { guildId, name } });
       if (!item) {
-        await interaction.reply({ content: `❌ Item **${name}** not found.` });
+        await interaction.reply({ embeds: [errorEmbed("Item Not Found", `**${name}** doesn't exist in the shop.`)] });
         return;
       }
       const wallet = await prisma.economyUser.upsert({
@@ -43,7 +55,7 @@ export default {
         update: {},
       });
       if (wallet.cash < item.price) {
-        await interaction.reply({ content: "❌ Insufficient funds." });
+        await interaction.reply({ embeds: [errorEmbed("Insufficient Funds", "You don't have enough coins to buy this item.")] });
         return;
       }
       await prisma.economyUser.update({ where: { id: key }, data: { cash: { decrement: item.price } } });
@@ -52,18 +64,32 @@ export default {
         create: { id: `${key}:${item.id}`, guildId, userId, itemId: item.id, quantity: 1 },
         update: { quantity: { increment: 1 } },
       });
-      await interaction.reply({ content: `✅ Purchased **${item.name}** for ${item.price} coins.` });
+      const embed = successEmbed(
+        "Item Purchased",
+        `Bought **${item.name}** for ${item.price.toLocaleString()} coins.`,
+      );
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
     if (subcommand === "inventory") {
       const items = await prisma.economyInventory.findMany({ where: { guildId, userId } });
       if (items.length === 0) {
-        await interaction.reply({ content: "Your inventory is empty." });
+        const embed = aerisEmbed()
+          .setColor(COLORS.neutral)
+          .setTitle("🎒 Inventory")
+          .setDescription("Your inventory is empty.");
+        await interaction.reply({ embeds: [embed] });
         return;
       }
-      const lines = items.map((i: { itemId: string; quantity: number }) => `• Item \`${i.itemId}\` × ${i.quantity}`);
-      await interaction.reply({ content: [`**🎒 Inventory**`, "", ...lines].join("\n") });
+      const lines = items.map(
+        (i: { itemId: string; quantity: number }) => `• \`${i.itemId}\` × ${i.quantity}`,
+      );
+      const embed = aerisEmbed()
+        .setColor(COLORS.economy)
+        .setTitle("🎒 Inventory")
+        .setDescription(lines.join("\n"));
+      await interaction.reply({ embeds: [embed] });
     }
   },
 };

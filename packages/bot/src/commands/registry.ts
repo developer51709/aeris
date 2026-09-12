@@ -18,7 +18,8 @@ export async function registerCommands(client: Client) {
   const dir = path.resolve("src/commands");
   if (fs.existsSync(dir)) {
     for (const file of fs.readdirSync(dir)) {
-      if (!file.endsWith(".js")) continue;
+      if (!file.endsWith(".ts") && !file.endsWith(".js")) continue;
+      if (file === "registry.ts" || file === "registry.js" || file === "interaction-router.ts" || file === "interaction-router.js") continue;
       const mod = await import(path.join(dir, file));
       if (mod.default && mod.default.data) {
         commands.set(mod.default.data.name, mod.default.data);
@@ -27,15 +28,25 @@ export async function registerCommands(client: Client) {
   }
 
   try {
+    const appId = process.env.BOT_OAUTH_CLIENT_ID ?? "";
+    const guildId = process.env.GUILD_ID;
+
     console.log("Started refreshing application (/) commands.");
-    await rest.put(
-      Routes.applicationGuildCommands(
-        process.env.BOT_OAUTH_CLIENT_ID ?? "",
-        process.env.GUILD_ID ?? "",
-      ),
-      { body: commands.map((c) => c.toJSON()) },
-    );
-    console.log("Successfully reloaded application (/) commands.");
+    if (guildId) {
+      // Register guild-specific commands (faster, good for development)
+      await rest.put(
+        Routes.applicationGuildCommands(appId, guildId),
+        { body: commands.map((c) => c.toJSON()) },
+      );
+      console.log(`Successfully reloaded ${commands.size} guild commands for guild ${guildId}.`);
+    } else {
+      // Register global commands (takes up to an hour to propagate)
+      await rest.put(
+        Routes.applicationCommands(appId),
+        { body: commands.map((c) => c.toJSON()) },
+      );
+      console.log(`Successfully reloaded ${commands.size} global commands.`);
+    }
   } catch (error) {
     console.error("Error registering commands:", error);
   }

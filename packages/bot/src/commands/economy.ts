@@ -1,12 +1,9 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
+import { aerisEmbed, COLORS } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -42,9 +39,15 @@ export default {
     switch (interaction.options.getSubcommand()) {
       case "balance": {
         const w = await getWallet();
-        await interaction.reply({
-          content: `💰 **Balance** — Cash: **${w.cash}** | Bank: **${w.bank}**`,
-        });
+        const embed = aerisEmbed()
+          .setColor(COLORS.economy)
+          .setTitle("💰 Balance")
+          .addFields(
+            { name: "Cash", value: w.cash.toLocaleString(), inline: true },
+            { name: "Bank", value: w.bank.toLocaleString(), inline: true },
+            { name: "Total", value: (w.cash + w.bank).toLocaleString(), inline: true },
+          );
+        await interaction.reply({ embeds: [embed] });
         break;
       }
       case "daily": {
@@ -54,9 +57,11 @@ export default {
         const cooldown = 24 * 60 * 60 * 1000;
         if (now - last < cooldown) {
           const remaining = Math.ceil((cooldown - (now - last)) / 3600000);
-          await interaction.reply({
-            content: `⏳ You already claimed your daily reward. Come back in **${remaining}h**.`,
-          });
+          const embed = aerisEmbed()
+            .setColor(COLORS.warning)
+            .setTitle("⏳ Daily Reward")
+            .setDescription(`You already claimed your daily reward. Come back in **${remaining}h**.`);
+          await interaction.reply({ embeds: [embed] });
           return;
         }
         const settings = await prisma.economySettings.findUnique({ where: { guildId } });
@@ -65,9 +70,11 @@ export default {
           where: { id: key },
           data: { cash: { increment: amount }, lastDaily: new Date() },
         });
-        await interaction.reply({
-          content: `🎁 Daily reward claimed: **${amount}** coins!`,
-        });
+        const embed = aerisEmbed()
+          .setColor(COLORS.economy)
+          .setTitle("🎁 Daily Reward")
+          .setDescription(`You claimed **${amount.toLocaleString()}** coins!`);
+        await interaction.reply({ embeds: [embed] });
         break;
       }
       case "work": {
@@ -79,21 +86,31 @@ export default {
         });
         const jobs = ["delivered packages", "walked dogs", "tutored students", "fixed a server", "wrote some code"];
         const job = jobs[Math.floor(Math.random() * jobs.length)];
-        await interaction.reply({
-          content: `🛠️ You ${job} and earned **${earnings}** coins!`,
-        });
+        const embed = aerisEmbed()
+          .setColor(COLORS.economy)
+          .setTitle("🛠️ Work")
+          .setDescription(`You ${job} and earned **${earnings}** coins!`);
+        await interaction.reply({ embeds: [embed] });
         break;
       }
       case "pay": {
         const target = interaction.options.getUser("user")!;
         const amount = interaction.options.getInteger("amount")!;
         if (target.id === userId) {
-          await interaction.reply({ content: "❌ You can't pay yourself." });
+          const embed = aerisEmbed()
+            .setColor(COLORS.danger)
+            .setTitle("Invalid Payment")
+            .setDescription("You can't pay yourself.");
+          await interaction.reply({ embeds: [embed] });
           return;
         }
         const w = await getWallet();
         if (w.cash < amount) {
-          await interaction.reply({ content: "❌ Insufficient funds." });
+          const embed = aerisEmbed()
+            .setColor(COLORS.danger)
+            .setTitle("Insufficient Funds")
+            .setDescription("You don't have enough coins for this transfer.");
+          await interaction.reply({ embeds: [embed] });
           return;
         }
         const targetKey = `${guildId}:${target.id}`;
@@ -106,9 +123,11 @@ export default {
           where: { id: key },
           data: { cash: { decrement: amount } },
         });
-        await interaction.reply({
-          content: `✅ Sent **${amount}** coins to ${target}.`,
-        });
+        const embed = aerisEmbed()
+          .setColor(COLORS.success)
+          .setTitle("✅ Payment Sent")
+          .setDescription(`Sent **${amount.toLocaleString()}** coins to ${target}.`);
+        await interaction.reply({ embeds: [embed] });
         break;
       }
       case "leaderboard": {
@@ -118,15 +137,24 @@ export default {
           take: 10,
         });
         if (rows.length === 0) {
-          await interaction.reply({ content: "No economy data yet." });
+          const embed = aerisEmbed()
+            .setColor(COLORS.neutral)
+            .setTitle("💰 Economy Leaderboard")
+            .setDescription("No economy data yet.");
+          await interaction.reply({ embeds: [embed] });
           return;
         }
         const lines = rows.map(
-          (r: { userId: string; cash: number; bank: number }, i: number) => `**${i + 1}.** <@${r.userId}> — 💰 ${r.cash} | 🏦 ${r.bank}`,
+          (r: { userId: string; cash: number; bank: number }, i: number) => {
+            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`;
+            return `${medal} <@${r.userId}> — 💰 ${r.cash.toLocaleString()} | 🏦 ${r.bank.toLocaleString()}`;
+          },
         );
-        await interaction.reply({
-          content: `**💰 Economy Leaderboard**\n\n${lines.join("\n")}`,
-        });
+        const embed = aerisEmbed()
+          .setColor(COLORS.economy)
+          .setTitle("💰 Economy Leaderboard")
+          .setDescription(lines.join("\n"));
+        await interaction.reply({ embeds: [embed] });
         break;
       }
     }
