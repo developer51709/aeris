@@ -7,7 +7,7 @@ export function LandingPage() {
       <nav className="sticky top-0 z-50 border-b border-border bg-surface/80 backdrop-blur supports-backdrop-blur:bg-surface/60">
         <div className="flex items-center justify-between px-4 md:px-6 max-w-6xl mx-auto">
           <Link to="/" className="flex items-center gap-3 text-lg font-semibold tracking-tight">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-strong flex items-center justify-center text-white text-sm font-bold shadow-sm">
               A
             </div>
             <span>Aeris</span>
@@ -38,7 +38,7 @@ export function LandingPage() {
           </div>
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight max-w-3xl">
             The Discord bot with{" "}
-            <span className="bg-gradient-to-r from-brand-light to-brand-dark bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand to-brand-strong bg-clip-text text-transparent">
               clean CV2 interfaces
             </span>
           </h1>
@@ -116,7 +116,7 @@ export function LandingPage() {
         <div className="py-16 px-4 md:px-6 max-w-6xl mx-auto">
           <div className="rounded-2xl border border-border bg-surface-2 p-6 md:p-10 shadow-sm">
             <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0">
+              <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-gradient-to-br from-brand to-brand-strong flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0">
                 A
               </div>
               <div className="text-center md:text-left">

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
-import { api } from "../lib/api";
-import { Wallet } from "lucide-react";
+import { api, ApiError } from "../lib/api";
+import { RefreshCw, Wallet } from "lucide-react";
+
+interface Guild {
+  id: string;
+  name?: string | null;
+}
 
 interface Entry {
   rank: number;
@@ -10,53 +15,97 @@ interface Entry {
 }
 
 export function Economy() {
+  const [guilds, setGuilds] = useState<Guild[]>([]);
+  const [guildId, setGuildId] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
       .get("/guilds")
-      .then(async (data) => {
-        const guilds = data as { id: string }[];
-        if (guilds.length === 0) {
-          setLoading(false);
-          return;
-        }
-        const board = await api.get(`/guilds/${guilds[0].id}/economy`);
-        setEntries(board as Entry[]);
-        setLoading(false);
+      .then((data) => {
+        const nextGuilds = Array.isArray(data) ? (data as Guild[]) : [];
+        setGuilds(nextGuilds);
+        setGuildId(nextGuilds[0]?.id ?? "");
       })
-      .catch(() => setLoading(false));
+      .catch((cause) => {
+        setError(cause instanceof ApiError ? cause.message : "Could not load your servers.");
+        setLoading(false);
+      });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-brand border-t-transparent" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!guildId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    api
+      .get(`/guilds/${guildId}/economy`)
+      .then((data) => setEntries(Array.isArray(data) ? (data as Entry[]) : []))
+      .catch((cause) => {
+        setError(cause instanceof ApiError ? cause.message : "Could not load economy data.");
+        setEntries([]);
+      })
+      .finally(() => setLoading(false));
+  }, [guildId]);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Economy</h1>
-      <p className="text-sm text-text-secondary">Wealthiest members across cash and bank</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-brand">Server economy</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">Economy</h1>
+          <p className="mt-1 text-sm text-text-secondary">Wealthiest members across cash and bank</p>
+        </div>
+        {guilds.length > 0 && (
+          <select
+            value={guildId}
+            onChange={(event) => setGuildId(event.target.value)}
+            aria-label="Choose a server"
+            className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm font-medium outline-none focus:border-brand"
+          >
+            {guilds.map((guild) => (
+              <option key={guild.id} value={guild.id}>
+                {guild.name ?? guild.id}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
-      <div className="mt-6 rounded-xl border border-border bg-surface-2 divide-y divide-border max-w-xl">
-        {entries.map((e) => (
-          <div key={e.userId} className="flex items-center gap-4 px-5 py-3">
-            <span className="w-8 text-center font-bold text-brand">{e.rank}</span>
-            <div className="flex-1">
-              <p className="font-medium text-sm">User {e.userId.slice(0, 8)}…</p>
-              <p className="text-xs text-text-secondary">🏦 {e.bank.toLocaleString()} in bank</p>
-            </div>
-            <span className="text-sm text-text-secondary">💰 {e.cash.toLocaleString()}</span>
+      <div className="mt-6 max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface-2">
+        {loading ? (
+          <div className="flex min-h-56 items-center justify-center">
+            <div className="h-9 w-9 animate-spin rounded-full border-4 border-brand border-t-transparent" />
           </div>
-        ))}
-        {entries.length === 0 && (
-          <div className="px-5 py-10 text-center text-text-secondary text-sm">
-            <Wallet className="mx-auto h-6 w-6 mb-2" />
+        ) : error ? (
+          <div className="p-10 text-center">
+            <RefreshCw className="mx-auto h-7 w-7 text-danger" />
+            <p className="mt-3 text-sm text-danger">{error}</p>
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="p-10 text-center text-sm text-text-secondary">
+            <Wallet className="mx-auto mb-3 h-7 w-7" />
             No economy data yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {entries.map((entry) => (
+              <div key={entry.userId} className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-5">
+                <span className="w-8 shrink-0 text-center font-bold text-brand">{entry.rank}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">User {entry.userId.slice(0, 8)}…</p>
+                  <p className="text-xs text-text-secondary">🏦 {entry.bank.toLocaleString()} in bank</p>
+                </div>
+                <span className="shrink-0 text-right text-sm font-medium text-text-secondary">
+                  💰 {entry.cash.toLocaleString()}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -11,25 +11,29 @@ function requireAuth(req: Request): { id: string; username: string; avatar?: str
   return user as { id: string; username: string; avatar?: string | null; guildIds: string[] };
 }
 
+function requireGuildAccess(req: Request, guildId: string | undefined) {
+  const user = requireAuth(req);
+  if (!guildId || !user.guildIds.includes(guildId)) {
+    throw new Error("Unauthorized");
+  }
+  return user;
+}
+
 router.get("/guilds", async (req: Request, res: Response) => {
   try {
     requireAuth(req);
     const userManagedGuilds = (req.session as any)?.user?.guildIds ?? [];
+    if (!Array.isArray(userManagedGuilds) || userManagedGuilds.length === 0) {
+      return res.json([]);
+    }
 
     const guilds = await prisma.guild.findMany({
       where: {
-        id: { in: userManagedGuilds.length ? userManagedGuilds : undefined },
+        id: { in: userManagedGuilds },
         name: { not: null },
       },
       orderBy: { createdAt: "desc" },
     });
-
-    if (guilds.length === 0) {
-      return res.status(404).json({
-        error: "No servers found",
-        message: "Connect Aeris to a Discord server you manage, then refresh.",
-      });
-    }
 
     return res.json(guilds);
   } catch (error) {
@@ -46,7 +50,7 @@ router.get("/guilds", async (req: Request, res: Response) => {
 
 router.get("/guilds/:id", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.id);
     const guild = await prisma.guild.findUnique({
       where: { id: req.params.id },
     });
@@ -71,7 +75,7 @@ router.get("/guilds/:id", async (req: Request, res: Response) => {
 
 router.put("/guilds/:id", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.id);
     const body = req.body ?? {};
 
     const guild = await prisma.guild.update({
@@ -99,7 +103,7 @@ router.put("/guilds/:id", async (req: Request, res: Response) => {
 
 router.get("/guilds/:id/stats", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.id);
     const guildId = req.params.id;
 
     const memberCountResult = prisma.guild
@@ -132,7 +136,7 @@ router.get("/guilds/:id/stats", async (req: Request, res: Response) => {
 
 router.get("/guilds/:id/leaderboard", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.id);
     const guildId = req.params.id;
     const entries = await prisma.levelingData.findMany({
       where: { guildId },
@@ -155,7 +159,7 @@ router.get("/guilds/:id/leaderboard", async (req: Request, res: Response) => {
 
 router.get("/guilds/:id/economy", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.id);
     const guildId = req.params.id;
     const entries = await prisma.economyUser.findMany({
       where: { guildId },
@@ -178,7 +182,7 @@ router.get("/guilds/:id/economy", async (req: Request, res: Response) => {
 
 router.post("/guilds/:id/test-card", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.id);
     // Placeholder: actual card generation happens in the bot package
     return res.json({
       ok: true,
@@ -191,7 +195,7 @@ router.post("/guilds/:id/test-card", async (req: Request, res: Response) => {
 
 router.get("/settings/:guildId/automod", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -222,7 +226,7 @@ router.get("/settings/:guildId/automod", async (req: Request, res: Response) => 
 
 router.put("/settings/:guildId/automod", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -265,7 +269,7 @@ router.put("/settings/:guildId/automod", async (req: Request, res: Response) => 
 
 router.get("/settings/:guildId/leveling", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const settings = await prisma.levelingSettings.findUnique({
       where: { guildId: req.params.guildId },
     });
@@ -289,7 +293,7 @@ router.get("/settings/:guildId/leveling", async (req: Request, res: Response) =>
 
 router.put("/settings/:guildId/leveling", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -324,35 +328,9 @@ router.put("/settings/:guildId/leveling", async (req: Request, res: Response) =>
   }
 });
 
-router.put("/settings/:guildId/leveling", async (req: Request, res: Response) => {
-  try {
-    requireAuth(req);
-    const data = req.body;
-    const settings = await prisma.levelingSettings.upsert({
-      where: { guildId: req.params.guildId },
-      create: {
-        guildId: req.params.guildId,
-        enabled: data.enabled ?? true,
-        xpMessage: data.xpMessage ?? "Your message earned you **{xp}** XP!",
-        levelUpMessage: data.levelUpMessage ?? "🎉 **{user}** just leveled up to **Level {level}**!",
-        autoRole: data.autoRole ?? null,
-      },
-      update: {
-        enabled: data.enabled ?? true,
-        xpMessage: data.xpMessage ?? "Your message earned you **{xp}** XP!",
-        levelUpMessage: data.levelUpMessage ?? "🎉 **{user}** just leveled up to **Level {level}**!",
-        autoRole: data.autoRole ?? null,
-      },
-    });
-    return res.json(settings);
-  } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
-  }
-});
-
 router.get("/settings/:guildId/economy", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -379,7 +357,7 @@ router.get("/settings/:guildId/economy", async (req: Request, res: Response) => 
 
 router.put("/settings/:guildId/economy", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -414,7 +392,7 @@ router.put("/settings/:guildId/economy", async (req: Request, res: Response) => 
 
 router.get("/settings/:guildId/welcome", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -445,7 +423,7 @@ router.get("/settings/:guildId/welcome", async (req: Request, res: Response) => 
 
 router.put("/settings/:guildId/welcome", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -488,7 +466,7 @@ router.put("/settings/:guildId/welcome", async (req: Request, res: Response) => 
 
 router.get("/settings/:guildId/tickets", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });
@@ -516,7 +494,7 @@ router.get("/settings/:guildId/tickets", async (req: Request, res: Response) => 
 
 router.put("/settings/:guildId/tickets", async (req: Request, res: Response) => {
   try {
-    requireAuth(req);
+    requireGuildAccess(req, req.params.guildId);
     const guildId = req.params.guildId;
     if (!guildId) {
       return res.status(400).json({ error: "Missing server ID" });

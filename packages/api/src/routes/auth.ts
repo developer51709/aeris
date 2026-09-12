@@ -43,7 +43,28 @@ const OAuthErrors = {
 };
 
 function sendOAuthNotConfigured(res: Response) {
-  return res.status(500).json(OAuthErrors.notConfigured);
+  return redirectOAuthError(res, OAuthErrors.notConfigured);
+}
+
+function dashboardBaseUrl() {
+  const configured = (process.env.DASHBOARD_URL ?? "").replace(/\/+$/, "");
+  return configured.endsWith("/dashboard")
+    ? configured.slice(0, -"/dashboard".length)
+    : configured;
+}
+
+function dashboardRedirect(path: string, params?: Record<string, string>) {
+  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return `${dashboardBaseUrl()}${path}${query}` || `${path}${query}`;
+}
+
+function redirectOAuthError(res: Response, error: { error: string; message: string }) {
+  return res.redirect(
+    dashboardRedirect("/auth", {
+      oauthError: error.error,
+      message: error.message,
+    }),
+  );
 }
 
 router.get("/discord", (req: Request, res: Response) => {
@@ -57,7 +78,7 @@ router.get("/discord", (req: Request, res: Response) => {
     return sendOAuthNotConfigured(res);
   }
 
-  const state = Math.random().toString(36).slice(2);
+  const state = crypto.randomBytes(24).toString("hex");
   (req.session as any).authState = state;
 
   const params = new URLSearchParams({
@@ -76,10 +97,18 @@ router.get("/discord", (req: Request, res: Response) => {
 router.get("/callback", async (req: Request, res: Response) => {
   const code = req.query.code as string;
   const state = req.query.state as string;
+  const providerError = req.query.error as string;
+
+  if (providerError) {
+    return redirectOAuthError(res, {
+      error: "Discord sign-in cancelled",
+      message: "Discord did not authorize the connection. You can try again whenever you’re ready.",
+    });
+  }
 
   if (!code || !state) {
     console.error("OAuth callback missing code/state. query:", req.query);
-    return res.status(400).json(OAuthErrors.missingParams);
+    return redirectOAuthError(res, OAuthErrors.missingParams);
   }
 
   const sessionState = (req.session as any).authState;
@@ -90,8 +119,9 @@ router.get("/callback", async (req: Request, res: Response) => {
       "query:",
       state,
     );
-    return res.status(400).json(OAuthErrors.stateMismatch);
+    return redirectOAuthError(res, OAuthErrors.stateMismatch);
   }
+  delete (req.session as any).authState;
 
   if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
     console.error("OAuth callback reached without configuration");
@@ -118,7 +148,7 @@ router.get("/callback", async (req: Request, res: Response) => {
         tokenRes.status,
         text.slice(0, 200),
       );
-      return res.status(502).json(OAuthErrors.tokenFailed);
+      return redirectOAuthError(res, OAuthErrors.tokenFailed);
     }
 
     const tokens = (await tokenRes.json()) as { access_token: string };
@@ -138,7 +168,7 @@ router.get("/callback", async (req: Request, res: Response) => {
         userRes.status,
         guildsRes.status,
       );
-      return res.status(502).json(OAuthErrors.fetchFailed);
+      return redirectOAuthError(res, OAuthErrors.fetchFailed);
     }
 
     const user = (await userRes.json()) as {
@@ -203,19 +233,10 @@ router.get("/callback", async (req: Request, res: Response) => {
       "managed guilds:",
       managedGuilds.length,
     );
-    const baseUrl = process.env.DASHBOARD_URL ?? "";
-    // If DASHBOARD_URL is set but doesn't end with /dashboard, append it.
-    // If not set at all, use a relative path (works when API and dashboard
-    // are on the same origin in production).
-    const redirectUrl = baseUrl
-      ? baseUrl.endsWith("/dashboard")
-        ? baseUrl
-        : `${baseUrl.replace(/\/$/, "/")}dashboard`
-      : "/dashboard";
-    return res.redirect(redirectUrl);
+    return res.redirect(dashboardRedirect("/dashboard"));
   } catch (error) {
     console.error("OAuth callback error:", error);
-    return res.status(500).json(OAuthErrors.unknown);
+    return redirectOAuthError(res, OAuthErrors.unknown);
   }
 });
 

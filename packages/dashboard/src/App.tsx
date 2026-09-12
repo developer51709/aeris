@@ -5,10 +5,7 @@ import { LandingPage } from "./pages/landing";
 import { DashboardPage } from "./pages/dashboard";
 import { DocsPage } from "./pages/docs";
 import { AuthPage } from "./pages/auth";
-import { api } from "./lib/api";
-
-const VITE_API_URL =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ?? "/api";
+import { ApiError, authApi } from "./lib/api";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<{ id: string } | null>(null);
@@ -16,16 +13,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .get("/auth/me")
+    authApi
+      .get("/me")
       .then((data) => {
         if (typeof data?.id === "string") {
           setSession(data as { id: string });
         }
         setLoading(false);
       })
-      .catch(() => {
-        setAuthError("Please sign in to continue.");
+      .catch((error) => {
+        if (error instanceof ApiError && error.status === 401) {
+          setLoading(false);
+          return;
+        }
+        setAuthError("We couldn’t reach the authentication service. Please try again.");
         setLoading(false);
       });
   }, []);
@@ -84,5 +85,3 @@ export default function App() {
     </Routes>
   );
 }
-
-export { VITE_API_URL };

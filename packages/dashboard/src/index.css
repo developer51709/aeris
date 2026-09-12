@@ -32,6 +32,9 @@
   }
 
   body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
     background-color: var(--color-surface);
     color: var(--color-text-primary);
     border-color: var(--color-border);
@@ -53,6 +56,26 @@
 
   button {
     cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-brand) 45%, transparent);
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select {
+    color: var(--color-text-primary);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-text-muted);
   }
 
   code {
