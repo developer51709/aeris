@@ -3,18 +3,10 @@ import { prisma } from "@aeris/shared";
 import { botInviteUrl, replyV2 } from "../components.js";
 
 const catalog: Record<string, string[]> = {
-  community: ["announce", "poll", "suggest", "starboard", "quote", "afk", "remind", "birthday", "role", "roles", "membercount", "servericon", "serverbanner", "boosters", "invites", "activity", "profile", "rep", "repboard", "events", "giveaway", "giveaway-end", "giveaway-reroll", "feedback", "slowmode"],
-  moderationx: ["clear", "purge", "slowmode", "lock", "unlock", "hide", "unhide", "timeout", "untimeout", "softban", "unban", "modlog", "history", "notes", "case", "cases", "massrole", "nick", "resetnick", "dehoist", "striproles", "verify", "unverify", "quarantine", "audit"],
-  server: ["settings", "prefix", "locale", "timezone", "channels", "roles", "permissions", "modules", "module", "logs", "log-channel", "welcome", "goodbye", "autorole", "autoroles", "rules", "verification", "vanity", "icon", "banner", "features", "backup", "backup-list", "backup-load", "health"],
-  social: ["hug", "pat", "kiss", "slap", "highfive", "poke", "wave", "dance", "cheer", "ship", "match", "rate", "8ball", "coinflip", "roll", "choose", "fortune", "meme", "joke", "fact", "quote", "ascii", "color", "avatar", "banner"],
   media: ["nowplaying", "volume", "loop", "shuffle", "remove", "move", "clear", "seek", "pause", "resume", "replay", "lyrics", "radio", "playlist", "playlist-save", "playlist-load", "playlist-delete", "soundboard", "soundboard-add", "soundboard-remove", "soundboard-list", "gif", "sticker", "media-help"],
 };
 
 const descriptions: Record<string, string> = {
-  community: "Community tools",
-  moderationx: "Moderation and audit tools",
-  server: "Server configuration and diagnostics",
-  social: "Social interactions and utilities",
   media: "Media and queue tools",
 };
 

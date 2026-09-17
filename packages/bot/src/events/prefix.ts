@@ -77,7 +77,12 @@ export async function onPrefixMessage(message: Message) {
   }
 
   if (root === "admin" && ["announce", "broadcast"].includes(tokens[0]?.toLowerCase() ?? "")) {
-    if (!message.member?.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    const ownerIds = (process.env.BOT_OWNER_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+    if (tokens[0] === "broadcast" && (!ownerIds.length || !ownerIds.includes(message.author.id))) {
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Admin command denied", body: "Only the configured bot owner can use this broadcast command." })] });
+      return;
+    }
+    if (tokens[0] !== "broadcast" && !message.member?.permissions.has(PermissionFlagsBits.ManageMessages)) {
       await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Admin command denied", body: "Manage Messages is required for announcements." })] });
       return;
     }

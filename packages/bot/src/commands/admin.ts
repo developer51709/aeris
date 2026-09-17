@@ -34,6 +34,14 @@ function can(interaction: ChatInputCommandInteraction, permission: bigint) {
   return Boolean(interaction.guild?.members.me?.permissions.has(permission));
 }
 
+function isBotOwner(interaction: ChatInputCommandInteraction) {
+  const configuredOwners = (process.env.BOT_OWNER_ID ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return configuredOwners.length > 0 && configuredOwners.includes(interaction.user.id);
+}
+
 function providerCount(value: string | undefined, fallback: string | undefined) {
   try {
     const parsed = JSON.parse(value ?? "[]");
@@ -50,7 +58,8 @@ export default {
     const subcommand = interaction.options.getSubcommand();
     const guild = interaction.guild;
     try {
-      if (["announce", "broadcast"].includes(subcommand) && !can(interaction, PermissionFlagsBits.ManageMessages)) throw new Error("I need Manage Messages for announcements.");
+      if (subcommand === "broadcast" && !isBotOwner(interaction)) throw new Error("Only the configured bot owner can use /admin broadcast.");
+      if (subcommand === "announce" && !can(interaction, PermissionFlagsBits.ManageMessages)) throw new Error("I need Manage Messages for announcements.");
       if (["webhook-create", "webhook-delete", "webhook-list"].includes(subcommand) && !can(interaction, PermissionFlagsBits.ManageWebhooks)) throw new Error("I need Manage Webhooks for webhook operations.");
       if (subcommand === "announce") {
         const channel = interaction.options.getChannel("channel", true);

@@ -42,8 +42,7 @@ const data = new SlashCommandBuilder()
   .addSubcommand((sub) => sub.setName("truthordare").setDescription("Get a truth or dare prompt"))
   .addSubcommand((sub) => sub.setName("joke").setDescription("Tell a programming joke"))
   .addSubcommand((sub) => sub.setName("fact").setDescription("Share a fact"))
-  .addSubcommand((sub) => sub.setName("fortune").setDescription("Get a fortune"))
-  .addSubcommand((sub) => sub.setName("blackjack-help").setDescription("Explain the blackjack command"));
+  .addSubcommand((sub) => sub.setName("fortune").setDescription("Get a fortune"));
 
 function board(width: number, height: number, value: string) {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => value).join(" ")).join("\n");
@@ -126,7 +125,6 @@ export default {
       if (game === "joke") return replyV2(interaction, { title: "Joke", body: choices(jokes) });
       if (game === "fact") return replyV2(interaction, { title: "Fact", body: choices(facts) });
       if (game === "fortune") return replyV2(interaction, { title: "Fortune", body: choices(["A small decision will open a big door.", "Your persistence is about to pay off.", "A useful connection is closer than you think."]) });
-      if (game === "blackjack-help") return replyV2(interaction, { title: "Blackjack", body: "Use `/blackjack bet:<amount>` to play a complete economy-backed round. Bets require at least 10 coins." });
       throw new Error(`Unknown fun game: ${game}`);
     } catch (error) {
       await replyV2(interaction, { title: "Fun command failed", body: error instanceof Error ? error.message : "The game could not start.", ephemeral: true });
