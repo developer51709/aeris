@@ -53,7 +53,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           <div className="w-full max-w-lg rounded-2xl border border-danger/40 bg-danger/5 p-8 text-center">
             <p className="text-sm text-danger">{authError}</p>
             <a
-              href="/auth"
+              href="/login"
               className="mt-4 inline-flex items-center justify-center rounded-xl bg-brand text-white px-5 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-all"
             >
               Try to sign in
@@ -63,7 +63,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </Layout>
     );
 
-  if (!session) return <Navigate to="/auth" replace />;
+  if (!session) return <Navigate to="/login" replace />;
   return <Layout>{children}</Layout>;
 }
 
@@ -71,7 +71,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/login" element={<AuthPage />} />
       <Route
         path="/dashboard/*"
         element={

@@ -15,7 +15,7 @@
     "@napi-rs/canvas": "^0.1.40",
     "dotenv": "^16.4.7",
     "cloudinary": "^2.5.1",
-    "discord.js": "^14.16.3",
+    "discord.js": "^14.27.0",
     "prisma": "^5.22.0",
     "tsyringe": "^4.8.1"
   },

@@ -23,6 +23,9 @@ export async function onReady(client: Client) {
         },
       });
     }
+    await prisma.guild.deleteMany({
+      where: { id: { notIn: client.guilds.cache.map((guild) => guild.id) } },
+    });
     console.log(`Synced ${client.guilds.cache.size} guilds to database`);
   } catch (error) {
     console.error("Failed to sync guilds to database:", error);

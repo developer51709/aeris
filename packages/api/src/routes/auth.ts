@@ -60,7 +60,7 @@ function dashboardRedirect(path: string, params?: Record<string, string>) {
 
 function redirectOAuthError(res: Response, error: { error: string; message: string }) {
   return res.redirect(
-    dashboardRedirect("/auth", {
+    dashboardRedirect("/login", {
       oauthError: error.error,
       message: error.message,
     }),
@@ -181,10 +181,11 @@ router.get("/callback", async (req: Request, res: Response) => {
     const guilds = (await guildsRes.json()) as {
       id: string;
       permissions: string;
+      owner?: boolean;
     }[];
     const MANAGE_SERVER = 1n << 5n;
     const managedGuilds = guilds
-      .filter((g) => (BigInt(g.permissions) & MANAGE_SERVER) !== 0n)
+      .filter((g) => g.owner === true || (BigInt(g.permissions || "0") & MANAGE_SERVER) !== 0n)
       .map((g) => g.id);
 
     (req.session as any).user = {
@@ -242,9 +243,34 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/me", async (req: Request, res: Response) => {
-  // Try cookie-session first
+  // Try cookie-session first. Refresh the OAuth guild list while the access
+  // token is available so newly-installed servers appear without another login.
   const user = (req.session as any)?.user;
   if (user && typeof user.id === "string") {
+    if (typeof user.accessToken === "string") {
+      try {
+        const guildsResponse = await fetch("https://discord.com/api/v10/users/@me/guilds", {
+          headers: { Authorization: `Bearer ${user.accessToken}` },
+        });
+        if (guildsResponse.ok) {
+          const guilds = (await guildsResponse.json()) as {
+            id: string;
+            permissions?: string;
+            owner?: boolean;
+          }[];
+          const managedGuilds = guilds
+            .filter((guild) =>
+              guild.owner === true ||
+              (BigInt(guild.permissions || "0") & (1n << 5n)) !== 0n,
+            )
+            .map((guild) => guild.id);
+          user.guildIds = managedGuilds;
+          (req.session as any).user = user;
+        }
+      } catch (error) {
+        console.error("Discord guild refresh failed:", error);
+      }
+    }
     return res.json(user);
   }
 

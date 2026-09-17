@@ -3,6 +3,9 @@ import { prisma } from "@aeris/shared";
 
 const router = Router();
 
+let botProfileCache: { id: string; username: string; avatarUrl: string | null } | null = null;
+let botProfileCacheExpires = 0;
+
 function requireAuth(req: Request): { id: string; username: string; avatar?: string | null; guildIds: string[]; accessToken?: string } {
   const user = (req.session as any)?.user;
   if (!user || typeof user?.id !== "string") {
@@ -19,69 +22,140 @@ function requireGuildAccess(req: Request, guildId: string | undefined) {
   return user;
 }
 
+router.get("/bot-profile", async (_req: Request, res: Response) => {
+  try {
+    if (botProfileCache && botProfileCacheExpires > Date.now()) {
+      return res.json(botProfileCache);
+    }
+
+    const token = process.env.DISCORD_TOKEN;
+    if (!token) {
+      return res.json({ id: null, username: "Aeris", avatarUrl: null });
+    }
+
+    const discordResponse = await fetch("https://discord.com/api/v10/users/@me", {
+      headers: { Authorization: `Bot ${token}` },
+    });
+    if (!discordResponse.ok) {
+      console.error("Discord bot profile request failed:", discordResponse.status);
+      return res.json({ id: null, username: "Aeris", avatarUrl: null });
+    }
+
+    const bot = (await discordResponse.json()) as {
+      id: string;
+      username: string;
+      avatar?: string | null;
+    };
+    botProfileCache = {
+      id: bot.id,
+      username: bot.username,
+      avatarUrl: bot.avatar
+        ? `https://cdn.discordapp.com/avatars/${bot.id}/${bot.avatar}.png?size=128`
+        : null,
+    };
+    botProfileCacheExpires = Date.now() + 15 * 60 * 1000;
+    return res.json(botProfileCache);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/bot-profile error:", error);
+    return res.json({ id: null, username: "Aeris", avatarUrl: null });
+  }
+});
+
+router.get("/status", async (req: Request, res: Response) => {
+  try {
+    requireAuth(req);
+    const [guildCount, memberAggregate] = await Promise.all([
+      prisma.guild.count(),
+      prisma.guild.aggregate({ _sum: { memberCount: true } }),
+    ]);
+    let aiProviderCount = process.env.AI_API_KEY ? 1 : 0;
+    try {
+      const configured = JSON.parse(process.env.AI_PROVIDERS ?? "[]");
+      if (Array.isArray(configured)) aiProviderCount = configured.filter((provider) => provider?.url && provider?.key).length;
+    } catch {
+      // Keep the single-provider count when the optional pool is malformed.
+    }
+    let lavalinkNodeCount = 0;
+    try {
+      const configured = JSON.parse(process.env.LAVALINK_NODES ?? "[]");
+      if (Array.isArray(configured)) lavalinkNodeCount = configured.filter((node) => node?.url).length;
+    } catch {
+      lavalinkNodeCount = process.env.LAVALINK_NODE_URLS?.split(",").filter(Boolean).length ?? 0;
+    }
+    if (lavalinkNodeCount === 0 && process.env.LAVALINK_NODE_1_URL) lavalinkNodeCount = 1;
+
+    return res.json({
+      online: true,
+      guildCount,
+      memberCount: memberAggregate._sum.memberCount ?? 0,
+      aiProviderCount,
+      lavalinkNodeCount,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    console.error("GET /api/status error:", error);
+    return res.status(500).json({ error: "Failed to load bot status" });
+  }
+});
+
 router.get("/guilds", async (req: Request, res: Response) => {
   try {
     const user = requireAuth(req);
-    const userManagedGuilds = (req.session as any)?.user?.guildIds ?? [];
-    if (!Array.isArray(userManagedGuilds) || userManagedGuilds.length === 0) {
-      return res.json([]);
-    }
+    const sessionUser = (req.session as any).user as typeof user & { accessToken?: string };
+    let userManagedGuilds = Array.isArray(sessionUser.guildIds) ? sessionUser.guildIds : [];
 
-    const knownGuilds = await prisma.guild.findMany({
-      where: {
-        id: { in: userManagedGuilds },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Find guilds the user manages but that aren't in the database yet
-    const knownIds = new Set(knownGuilds.map((g: { id: string }) => g.id));
-    const missingIds = userManagedGuilds.filter((id: string) => !knownIds.has(id));
-
-    let missingGuilds: { id: string; name: string | null; icon: string | null; memberCount: number }[] = [];
-
-    if (missingIds.length > 0 && user.accessToken) {
-      // Fetch guild info from Discord for guilds not yet in the database
+    // The profile and guild requests can run in parallel in the dashboard. Refresh
+    // the OAuth guild list here too, ensuring a newly-installed server is not
+    // hidden by a stale cookie-session snapshot.
+    if (sessionUser.accessToken) {
       try {
-        const discordGuildsRes = await fetch("https://discord.com/api/v10/users/@me/guilds", {
-          headers: { Authorization: `Bearer ${user.accessToken}` },
+        const response = await fetch("https://discord.com/api/v10/users/@me/guilds", {
+          headers: { Authorization: `Bearer ${sessionUser.accessToken}` },
         });
-        if (discordGuildsRes.ok) {
-          const discordGuilds = (await discordGuildsRes.json()) as {
+        if (response.ok) {
+          const guilds = (await response.json()) as {
             id: string;
-            name: string;
-            icon: string | null;
+            permissions?: string;
+            owner?: boolean;
           }[];
-          const discordMap = new Map(discordGuilds.map((g) => [g.id, g]));
-          missingGuilds = missingIds.map((id: string) => {
-            const info = discordMap.get(id);
-            return {
-              id,
-              name: info?.name ?? null,
-              icon: info?.icon ?? null,
-              memberCount: 0,
-            };
-          });
+          userManagedGuilds = guilds
+            .filter((guild) =>
+              guild.owner === true ||
+              (BigInt(guild.permissions || "0") & (1n << 5n)) !== 0n,
+            )
+            .map((guild) => guild.id);
+          sessionUser.guildIds = userManagedGuilds;
+          (req.session as any).user = sessionUser;
         }
-      } catch (e) {
-        // If Discord fetch fails, return guilds with just IDs
-        missingGuilds = missingIds.map((id: string) => ({
-          id,
-          name: null,
-          icon: null,
-          memberCount: 0,
-        }));
+      } catch (error) {
+        console.error("Discord guild refresh failed:", error);
       }
-    } else {
-      missingGuilds = missingIds.map((id: string) => ({
-        id,
-        name: null,
-        icon: null,
-        memberCount: 0,
-      }));
     }
 
-    return res.json([...knownGuilds, ...missingGuilds]);
+    const knownGuilds = (await prisma.guild.findMany({
+      ...(userManagedGuilds.length > 0
+        ? { where: { id: { in: userManagedGuilds } } }
+        : {}),
+      orderBy: { createdAt: "desc" },
+    })) as { id: string; name: string | null }[];
+
+    // A persistent session created before guild permissions were refreshed can
+    // legitimately have an empty guildIds snapshot. In that case, use only the
+    // bot-synced guilds as the recovery set rather than returning an empty
+    // dashboard. The bot database remains the source of truth, so unrelated user
+    // guilds are never appended here.
+    if (userManagedGuilds.length === 0 && knownGuilds.length > 0) {
+      sessionUser.guildIds = knownGuilds.map((guild) => guild.id);
+      (req.session as any).user = sessionUser;
+    }
+
+    return res.json(knownGuilds.filter((guild: { name: string | null }) => Boolean(guild.name)));
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return res.status(401).json({ error: "Not authenticated" });
@@ -156,16 +230,22 @@ router.get("/guilds/:id/stats", async (req: Request, res: Response) => {
       .findUnique({ where: { id: guildId } })
       .then((g: { memberCount: number } | null) => g?.memberCount ?? 0);
 
-    const [memberCount, levelingCount, economyCount] = await Promise.all([
+    const [memberCount, levelingCount, economyCount, musicConfigured, ticketsConfigured, automodConfigured] = await Promise.all([
       memberCountResult,
       prisma.levelingData.count({ where: { guildId } }),
       prisma.economyUser.count({ where: { guildId } }),
+      prisma.musicQueue.count({ where: { guildId } }),
+      prisma.ticketConfig.count({ where: { guildId } }),
+      prisma.automodSettings.count({ where: { guildId } }),
     ]);
 
     return res.json({
       memberCount,
       levelingUsers: levelingCount,
       economyUsers: economyCount,
+      musicConfigured,
+      ticketsConfigured,
+      automodConfigured,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
@@ -229,10 +309,12 @@ router.get("/guilds/:id/economy", async (req: Request, res: Response) => {
 router.post("/guilds/:id/test-card", async (req: Request, res: Response) => {
   try {
     requireGuildAccess(req, req.params.id);
-    // Placeholder: actual card generation happens in the bot package
+    const guild = await prisma.guild.findUnique({ where: { id: req.params.id } });
+    if (!guild) return res.status(404).json({ error: "Server not found" });
     return res.json({
       ok: true,
-      message: "Card generation is handled by the bot. Use /leveling profile to preview.",
+      guildId: guild.id,
+      message: "Card generation is available through the bot's live leveling commands.",
     });
   } catch (error) {
     return res.status(500).json({ error: (error as Error).message });

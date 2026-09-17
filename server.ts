@@ -32,17 +32,28 @@ async function boot() {
   if (PROD) {
     console.log("Starting API server...");
     const api = startProcess("api", ["dist/index.js"]);
+    console.log("Starting Discord bot...");
+    const bot = startProcess("bot", ["packages/bot/dist/index.js"]);
 
-    await once(api, "exit");
-    console.log("API process stopped");
-    process.exit(0);
+    // Keep the host process alive while either service is running. If one
+    // service exits, terminate the other so the platform can restart both
+    // together instead of leaving a dashboard without its bot.
+    await Promise.race([once(api, "exit"), once(bot, "exit")]);
+    console.log("Aeris service stopped; shutting down remaining services");
+    api.kill("SIGTERM");
+    bot.kill("SIGTERM");
+    process.exit(1);
   } else {
     console.log("Starting API server (via tsx)...");
     const api = startProcess("api", ["--import", "tsx/esm", "./packages/api/src/index.ts"]);
+    console.log("Starting Discord bot (via tsx)...");
+    const bot = startProcess("bot", ["--import", "tsx/esm", "./packages/bot/src/index.ts"]);
 
-    await once(api, "exit");
-    console.log("API process stopped");
-    process.exit(0);
+    await Promise.race([once(api, "exit"), once(bot, "exit")]);
+    console.log("Aeris service stopped; shutting down remaining services");
+    api.kill("SIGTERM");
+    bot.kill("SIGTERM");
+    process.exit(1);
   }
 }
 

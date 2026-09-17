@@ -9,6 +9,7 @@ import { prisma } from "@aeris/shared";
 import { authRoutes } from "./routes/auth.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { searchRoutes } from "./routes/search.js";
+import { lookupRoutes } from "./routes/lookups.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -52,6 +53,7 @@ app.use(
 app.use("/auth", authRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/search", searchRoutes);
+app.use("/api/lookups", lookupRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

@@ -8,7 +8,7 @@
     "db:generate": "pnpm --filter @aeris/shared db:generate",
     "db:push": "pnpm --filter @aeris/shared db:push",
     "start": "tsx server.ts",
-    "start:prod": "node dist/server.js"
+    "start:prod": "NODE_ENV=production node dist/server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

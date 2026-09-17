@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   BookOpen,
+  Gamepad2,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -10,7 +11,7 @@ import {
   Sun,
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { authApi } from "../lib/api";
+import { api, authApi } from "../lib/api";
 
 type Theme = "light" | "dark";
 
@@ -18,6 +19,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme | null>(null);
   const [mobile, setMobile] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [botAvatar, setBotAvatar] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get("/bot-profile").then((data) => {
+      const profile = data as { avatarUrl?: string | null };
+      setBotAvatar(profile.avatarUrl ?? null);
+    }).catch(() => {
+      // The letter fallback keeps the shell usable if Discord is unavailable.
+    });
+  }, []);
   const prefersDark =
     typeof window !== "undefined"
       ? window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -49,6 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const links: { to: string; icon: typeof Settings; label: string; end?: boolean }[] = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
     { to: "/dashboard/guilds", icon: Settings, label: "Servers" },
+    { to: "/dashboard/integrations", icon: Gamepad2, label: "Integrations" },
     { to: "/docs", icon: BookOpen, label: "Docs" },
   ];
 
@@ -57,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     try {
       await authApi.post("/logout");
     } finally {
-      window.location.assign("/auth");
+      window.location.assign("/login");
     }
   }
 
@@ -69,9 +81,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             to="/dashboard"
             className="flex items-center gap-3 text-lg font-semibold tracking-tight"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-strong flex items-center justify-center text-white text-sm font-bold shadow-sm">
-              A
-            </div>
+            {botAvatar ? (
+              <img
+                src={botAvatar}
+                alt="Aeris bot"
+                className="h-8 w-8 rounded-lg object-cover shadow-sm"
+                onError={() => setBotAvatar(null)}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-strong flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                A
+              </div>
+            )}
             <span>Aeris</span>
           </NavLink>
 
@@ -150,6 +171,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 {link.label}
               </NavLink>
             ))}
+            <button
+              type="button"
+              onClick={signOut}
+              disabled={loggingOut}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-brand hover:bg-surface-2 transition-colors disabled:opacity-60"
+            >
+              <LogOut className="h-4 w-4" />
+              {loggingOut ? "Signing out…" : "Sign out"}
+            </button>
           </nav>
         )}
       </header>

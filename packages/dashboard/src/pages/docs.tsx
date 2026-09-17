@@ -187,7 +187,7 @@ export function DocsPage() {
       )}
 
       <div className="mt-12 text-center">
-        <Link to="/auth" className="text-sm text-brand hover:underline">
+        <Link to="/login" className="text-sm text-brand hover:underline">
           Ready to launch Aeris? Sign in →
         </Link>
       </div>

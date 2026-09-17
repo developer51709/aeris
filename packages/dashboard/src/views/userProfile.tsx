@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bot, Shield, Zap, Wallet, Music, Ticket, ArrowRight, RefreshCw, User } from "lucide-react";
-import { api, ApiError } from "../lib/api";
+import { api, authApi, ApiError } from "../lib/api";
 import { cn } from "../lib/utils";
 
 interface UserProfile {
@@ -18,6 +18,15 @@ interface Guild {
   memberCount?: number;
 }
 
+interface BotStatus {
+  online: boolean;
+  guildCount: number;
+  memberCount: number;
+  aiProviderCount?: number;
+  lavalinkNodeCount?: number;
+  checkedAt: string;
+}
+
 function getAvatarUrl(userId: string, avatar: string | null | undefined) {
   if (avatar) {
     return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=128`;
@@ -28,6 +37,7 @@ function getAvatarUrl(userId: string, avatar: string | null | undefined) {
 export function UserProfile() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [guilds, setGuilds] = useState<Guild[]>([]);
+  const [status, setStatus] = useState<BotStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,15 +46,19 @@ export function UserProfile() {
     setLoading(true);
 
     Promise.all([
-      api.get("/../auth/me").catch(() => null),
+      authApi.get("/me").catch(() => null),
       api.get("/guilds").catch(() => []),
+      api.get("/status").catch(() => null),
     ])
-      .then(([userData, guildData]) => {
+      .then(([userData, guildData, statusData]) => {
         if (cancelled) return;
         if (userData && typeof userData === "object" && "id" in userData) {
           setUser(userData as UserProfile);
         }
         setGuilds(Array.isArray(guildData) ? (guildData as Guild[]) : []);
+        if (statusData && typeof statusData === "object" && "online" in statusData) {
+          setStatus(statusData as BotStatus);
+        }
       })
       .catch((cause) => {
         if (cancelled) return;
@@ -123,8 +137,27 @@ export function UserProfile() {
         </Link>
       </div>
 
+      {/* Bot status */}
+      <div className="mt-8 rounded-2xl border border-border bg-surface-2 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary">Aeris status</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${status?.online ? "bg-success" : "bg-danger"}`} />
+              <span className="font-semibold">{status?.online ? "Operational" : "Needs attention"}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <div className="rounded-xl bg-surface-raised px-4 py-3"><p className="text-xl font-bold">{status?.guildCount ?? guilds.length}</p><p className="text-text-secondary">Servers</p></div>
+            <div className="rounded-xl bg-surface-raised px-4 py-3"><p className="text-xl font-bold">{(status?.memberCount ?? 0).toLocaleString()}</p><p className="text-text-secondary">Members</p></div>
+            <div className="hidden rounded-xl bg-surface-raised px-4 py-3 sm:block"><p className="text-xl font-bold">{status?.aiProviderCount ?? 0}</p><p className="text-text-secondary">AI providers</p></div>
+            <div className="hidden rounded-xl bg-surface-raised px-4 py-3 lg:block"><p className="text-xl font-bold">{status?.lavalinkNodeCount ?? 0}</p><p className="text-text-secondary">Music nodes</p></div>
+          </div>
+        </div>
+      </div>
+
       {/* Quick stats */}
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {quickLinks.map((item) => (
           <div
             key={item.label}
@@ -163,7 +196,7 @@ export function UserProfile() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold group-hover:text-brand">
-                    {guild.name ?? guild.id}
+                    {guild.name ?? "Unnamed server"}
                   </p>
                   <p className="text-xs text-text-secondary">
                     {guild.memberCount?.toLocaleString() ?? "—"} members

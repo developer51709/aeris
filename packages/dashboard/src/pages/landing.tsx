@@ -1,15 +1,41 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Activity, Bot, Code, Music, Shield, Ticket, Zap, ArrowRight, CheckCircle, ChevronRight } from "lucide-react";
+import { api } from "../lib/api";
 
 export function LandingPage() {
+  const [botAvatar, setBotAvatar] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get("/bot-profile").then((data) => {
+      const profile = data as { avatarUrl?: string | null };
+      setBotAvatar(profile.avatarUrl ?? null);
+    }).catch(() => {
+      // Keep the branded fallback if Discord is temporarily unavailable.
+    });
+  }, []);
+
+  function BotLogo({ className }: { className: string }) {
+    return botAvatar ? (
+      <img
+        src={botAvatar}
+        alt="Aeris bot"
+        className={`${className} object-cover`}
+        onError={() => setBotAvatar(null)}
+      />
+    ) : (
+      <div className={`${className} flex items-center justify-center bg-gradient-to-br from-brand to-brand-strong text-white font-bold`}>
+        A
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <nav className="sticky top-0 z-50 border-b border-border bg-surface/80 backdrop-blur supports-backdrop-blur:bg-surface/60">
         <div className="flex items-center justify-between px-4 md:px-6 max-w-6xl mx-auto">
           <Link to="/" className="flex items-center gap-3 text-lg font-semibold tracking-tight">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-strong flex items-center justify-center text-white text-sm font-bold shadow-sm">
-              A
-            </div>
+            <BotLogo className="h-8 w-8 rounded-lg text-sm shadow-sm" />
             <span>Aeris</span>
           </Link>
           <div className="flex items-center gap-3">
@@ -20,7 +46,7 @@ export function LandingPage() {
               Docs
             </Link>
             <Link
-              to="/auth"
+              to="/login"
               className="inline-flex items-center gap-1 rounded-lg bg-brand/10 text-brand px-3 py-1.5 text-sm font-medium hover:bg-brand/20 transition-colors border border-border-strong"
             >
               Dashboard
@@ -49,7 +75,7 @@ export function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              to="/auth"
+              to="/login"
               className="inline-flex items-center gap-2 rounded-xl bg-brand text-white px-6 py-3 text-base font-semibold shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 transition-all hover:-translate-y-0.5"
             >
               Launch Aeris
@@ -116,9 +142,7 @@ export function LandingPage() {
         <div className="py-16 px-4 md:px-6 max-w-6xl mx-auto">
           <div className="rounded-2xl border border-border bg-surface-2 p-6 md:p-10 shadow-sm">
             <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-gradient-to-br from-brand to-brand-strong flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0">
-                A
-              </div>
+              <BotLogo className="h-28 w-28 md:h-36 md:w-36 rounded-2xl text-3xl shadow-lg flex-shrink-0" />
               <div className="text-center md:text-left">
                 <h2 className="text-2xl font-bold">Built for a clean aesthetic</h2>
                 <p className="mt-2 text-text-secondary">

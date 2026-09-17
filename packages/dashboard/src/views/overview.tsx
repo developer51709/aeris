@@ -14,6 +14,9 @@ interface Stats {
   memberCount?: number;
   levelingUsers?: number;
   economyUsers?: number;
+  musicConfigured?: number;
+  ticketsConfigured?: number;
+  automodConfigured?: number;
 }
 
 function number(value: number | undefined, loading = false) {
@@ -120,9 +123,9 @@ export function Overview() {
   const statsCards = [
     { icon: Zap, label: "Leveling", value: stats?.levelingUsers, color: "bg-brand/10 text-brand" },
     { icon: Wallet, label: "Economy", value: stats?.economyUsers, color: "bg-green-500/10 text-green-600 dark:text-green-400" },
-    { icon: Music, label: "Music", value: 0, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
-    { icon: Ticket, label: "Tickets", value: 0, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-    { icon: Shield, label: "Automod", value: 0, color: "bg-red-500/10 text-red-600 dark:text-red-400" },
+    { icon: Music, label: "Music", value: stats?.musicConfigured, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
+    { icon: Ticket, label: "Tickets", value: stats?.ticketsConfigured, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+    { icon: Shield, label: "Automod", value: stats?.automodConfigured, color: "bg-red-500/10 text-red-600 dark:text-red-400" },
     { icon: Users, label: "Members", value: stats?.memberCount, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
   ];
 
@@ -166,7 +169,7 @@ export function Overview() {
                   <Bot className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="truncate font-semibold">{active?.name ?? active?.id}</h2>
+                  <h2 className="truncate font-semibold">{active?.name ?? "Unnamed server"}</h2>
                   <p className="text-sm text-text-secondary">
                     {statsError ?? "Aeris is active in this server"}
                   </p>
@@ -183,7 +186,7 @@ export function Overview() {
                 >
                   {guilds.map((guild) => (
                     <option key={guild.id} value={guild.id}>
-                      {guild.name ?? guild.id}
+                      {guild.name ?? "Unnamed server"}
                     </option>
                   ))}
                 </select>
