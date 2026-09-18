@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Bot, Shield, Zap, Wallet, Music, Ticket, ArrowRight, RefreshCw, User } from "lucide-react";
 import { api, authApi, ApiError } from "../lib/api";
 import { cn } from "../lib/utils";
+import { DASHBOARD_EXTRA, useI18n } from "../i18n";
 
 interface UserProfile {
   id: string;
@@ -40,6 +41,8 @@ export function UserProfile() {
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { locale } = useI18n();
+  const copy = DASHBOARD_EXTRA[locale];
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +124,7 @@ export function UserProfile() {
             </div>
           </div>
           <div>
-            <p className="text-sm font-medium text-brand">Welcome back</p>
+            <p className="text-sm font-medium text-brand">{copy.welcome}</p>
             <h1 className="text-2xl font-bold tracking-tight">{user?.username ?? "User"}</h1>
             <p className="mt-0.5 text-sm text-text-secondary">
               Managing {guilds.length} server{guilds.length !== 1 ? "s" : ""}
@@ -132,7 +135,7 @@ export function UserProfile() {
           to="/dashboard/guilds"
           className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand/30"
         >
-          Manage Servers
+          {copy.manage}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -141,15 +144,15 @@ export function UserProfile() {
       <div className="mt-8 rounded-2xl border border-border bg-surface-2 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary">Aeris status</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary">{copy.status}</p>
             <div className="mt-2 flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${status?.online ? "bg-success" : "bg-danger"}`} />
-              <span className="font-semibold">{status?.online ? "Operational" : "Needs attention"}</span>
+              <span className="font-semibold">{status?.online ? copy.operational : copy.attention}</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div className="rounded-xl bg-surface-raised px-4 py-3"><p className="text-xl font-bold">{status?.guildCount ?? guilds.length}</p><p className="text-text-secondary">Servers</p></div>
-            <div className="rounded-xl bg-surface-raised px-4 py-3"><p className="text-xl font-bold">{(status?.memberCount ?? 0).toLocaleString()}</p><p className="text-text-secondary">Members</p></div>
+            <div className="rounded-xl bg-surface-raised px-4 py-3"><p className="text-xl font-bold">{(status?.memberCount ?? 0).toLocaleString()}</p><p className="text-text-secondary">{copy.members}</p></div>
             <div className="hidden rounded-xl bg-surface-raised px-4 py-3 sm:block"><p className="text-xl font-bold">{status?.aiProviderCount ?? 0}</p><p className="text-text-secondary">AI providers</p></div>
             <div className="hidden rounded-xl bg-surface-raised px-4 py-3 lg:block"><p className="text-xl font-bold">{status?.lavalinkNodeCount ?? 0}</p><p className="text-text-secondary">Music nodes</p></div>
           </div>
@@ -176,12 +179,12 @@ export function UserProfile() {
       {guilds.length > 0 && (
         <div className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Your Servers</h2>
+            <h2 className="text-lg font-semibold">{copy.yourServers}</h2>
             <Link
               to="/dashboard/guilds"
               className="text-sm font-medium text-brand hover:underline"
             >
-              View all →
+              {copy.viewAll}
             </Link>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -212,7 +215,7 @@ export function UserProfile() {
       {guilds.length === 0 && (
         <div className="mt-8 rounded-2xl border border-dashed border-border-strong bg-surface-2 p-10 text-center">
           <User className="mx-auto h-9 w-9 text-text-secondary" />
-          <h2 className="mt-4 text-lg font-semibold">No servers yet</h2>
+          <h2 className="mt-4 text-lg font-semibold">{copy.noServers}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
             Connect Aeris to a Discord server you manage, then come back here.
           </p>

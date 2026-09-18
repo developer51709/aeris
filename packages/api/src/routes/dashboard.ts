@@ -143,7 +143,12 @@ router.get("/guilds", async (req: Request, res: Response) => {
         ? { where: { id: { in: userManagedGuilds } } }
         : {}),
       orderBy: { createdAt: "desc" },
-    })) as { id: string; name: string | null }[];
+    })) as { id: string; name: string | null; icon: string | null; memberCount: number }[];
+
+    console.log("Guild dashboard lookup:", {
+      oauthManagedGuildCount: userManagedGuilds.length,
+      botSyncedGuildCount: knownGuilds.length,
+    });
 
     // A persistent session created before guild permissions were refreshed can
     // legitimately have an empty guildIds snapshot. In that case, use only the
@@ -155,7 +160,9 @@ router.get("/guilds", async (req: Request, res: Response) => {
       (req.session as any).user = sessionUser;
     }
 
-    return res.json(knownGuilds.filter((guild: { name: string | null }) => Boolean(guild.name)));
+    // Do not discard a valid bot-synced guild because Discord has not supplied
+    // its name yet. The dashboard can safely fall back to the guild ID.
+    return res.json(knownGuilds);
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return res.status(401).json({ error: "Not authenticated" });
@@ -318,6 +325,36 @@ router.post("/guilds/:id/test-card", async (req: Request, res: Response) => {
     });
   } catch (error) {
     return res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+const SUPPORTED_LOCALES = ["en", "es", "de", "fr", "hi", "ru"] as const;
+
+router.get("/settings/:guildId/language", async (req: Request, res: Response) => {
+  try {
+    requireGuildAccess(req, req.params.guildId);
+    const guild = await prisma.guild.findUnique({ where: { id: req.params.guildId }, select: { locale: true } });
+    return res.json({ locale: guild?.locale && SUPPORTED_LOCALES.includes(guild.locale as (typeof SUPPORTED_LOCALES)[number]) ? guild.locale : "en" });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") return res.status(401).json({ error: "Not authenticated" });
+    console.error("GET /api/settings/:guildId/language error:", error);
+    return res.status(500).json({ error: "Failed to load language setting" });
+  }
+});
+
+router.put("/settings/:guildId/language", async (req: Request, res: Response) => {
+  try {
+    requireGuildAccess(req, req.params.guildId);
+    const locale = String(req.body?.locale ?? "en");
+    if (!SUPPORTED_LOCALES.includes(locale as (typeof SUPPORTED_LOCALES)[number])) {
+      return res.status(400).json({ error: "Unsupported language" });
+    }
+    const guild = await prisma.guild.update({ where: { id: req.params.guildId }, data: { locale } });
+    return res.json({ locale: guild.locale });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") return res.status(401).json({ error: "Not authenticated" });
+    console.error("PUT /api/settings/:guildId/language error:", error);
+    return res.status(500).json({ error: "Failed to save language setting" });
   }
 });
 

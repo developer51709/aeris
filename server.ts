@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./load-env.js";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bot, Users, Wallet, Music, Ticket, Shield, Zap, RefreshCw } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { cn } from "../lib/utils";
+import { useI18n } from "../i18n";
 
 interface Guild {
   id: string;
@@ -42,6 +43,7 @@ export function Overview() {
   const [error, setError] = useState<string | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const { t } = useI18n();
 
   useEffect(() => {
     let cancelled = false;
@@ -145,9 +147,9 @@ export function Overview() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-brand">Aeris control center</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">{t.dashboard}</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Manage your servers and Aeris settings
+            {t.manageServers}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-text-secondary">

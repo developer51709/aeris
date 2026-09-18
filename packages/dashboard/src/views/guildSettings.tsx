@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
-import { Save, Shield, Zap, Wallet, Ticket, RefreshCw, ArrowLeft, Settings } from "lucide-react";
+import { Save, Shield, Zap, Wallet, Ticket, RefreshCw, ArrowLeft, Settings, Languages } from "lucide-react";
+import { LOCALE_LABELS, SUPPORTED_LOCALES, useI18n } from "../i18n";
 
-type Section = "automod" | "leveling" | "economy" | "tickets";
+type Section = "language" | "automod" | "leveling" | "economy" | "tickets";
 type Guild = { id: string; name?: string | null };
 
 const SECTIONS: { key: Section; label: string; icon: typeof Shield }[] = [
+  { key: "language", label: "Language", icon: Languages },
   { key: "automod", label: "Automod", icon: Shield },
   { key: "leveling", label: "Leveling", icon: Zap },
   { key: "economy", label: "Economy", icon: Wallet },
@@ -24,6 +26,7 @@ export function GuildSettings() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { t } = useI18n();
 
   // Fetch guild info
   useEffect(() => {
@@ -189,7 +192,7 @@ export function GuildSettings() {
             to="/dashboard/guilds"
             className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-brand transition-colors"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Servers
+            <ArrowLeft className="h-3.5 w-3.5" /> {t.backToServers}
           </Link>
           <div className="mt-2 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
@@ -197,12 +200,12 @@ export function GuildSettings() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">{guild?.name ?? guildId}</h1>
-              <p className="text-sm text-text-secondary">Server configuration</p>
+              <p className="text-sm text-text-secondary">{t.serverConfiguration}</p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {saved && <span className="text-sm font-medium text-success">Saved</span>}
+          {saved && <span className="text-sm font-medium text-success">{t.saved}</span>}
           <button
             type="button"
             onClick={save}
@@ -210,7 +213,7 @@ export function GuildSettings() {
             className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-strong disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t.saving : t.saveChanges}
           </button>
         </div>
       </div>
@@ -244,6 +247,25 @@ export function GuildSettings() {
           </div>
         ) : (
           <div className="space-y-3">
+            {section === "language" && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold">{t.botLanguage}</h2>
+                  <p className="mt-1 text-sm text-text-secondary">{t.botLanguageDescription}</p>
+                </div>
+                <label className="block">
+                  <span className="text-sm font-medium text-text-secondary">{t.selectLanguage}</span>
+                  <select
+                    value={String(settings.locale ?? "en")}
+                    onChange={(event) => set("locale", event.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus:border-brand"
+                  >
+                    {SUPPORTED_LOCALES.map((locale) => <option key={locale} value={locale}>{LOCALE_LABELS[locale]}</option>)}
+                  </select>
+                </label>
+                <p className="rounded-lg border border-brand/20 bg-brand/5 px-3 py-2 text-sm text-text-secondary">{t.languageDescription}</p>
+              </div>
+            )}
             {section === "automod" && (
               <>
                 <ToggleField label="Spam detection" k="spamEnabled" />

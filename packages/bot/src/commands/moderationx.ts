@@ -5,7 +5,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { prisma } from "@aeris/shared";
-import { replyV2 } from "../components.js";
+import { editV2, replyV2 } from "../components.js";
 
 const names = ["clear", "purge", "slowmode", "lock", "unlock", "hide", "unhide", "timeout", "untimeout", "softban", "unban", "modlog", "history", "notes", "case", "cases", "massrole", "nick", "resetnick", "dehoist", "striproles", "verify", "unverify", "quarantine", "audit"] as const;
 
@@ -123,18 +123,48 @@ export default {
         return replyV2(interaction, { title: `${command} complete`, body: `${role} was ${command === "unverify" ? "removed from" : "applied to"} ${user}.` });
       }
       if (command === "massrole") {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) throw new Error("You need Manage Roles to run a mass role change.");
         if (!has(interaction, PermissionFlagsBits.ManageRoles)) throw new Error("I need Manage Roles for mass role changes.");
         const selected = interaction.options.getRole("role", true);
         const role = await interaction.guild.roles.fetch(selected.id);
-        if (!role || !role.editable) throw new Error("That role cannot be managed by me.");
+        const me = interaction.guild.members.me;
+        if (!role || role.managed) throw new Error("That role is managed by an integration and cannot be assigned.");
+        if (!me || role.position >= me.roles.highest.position) throw new Error("That role must be below my highest role.");
+
+        // A cache is only a snapshot of members this process has encountered. Fetch
+        // the authoritative guild member list before changing roles so newly joined
+        // and quiet members are included as well.
+        await interaction.deferReply();
+        const members = await interaction.guild.members.fetch();
         const action = interaction.options.getString("action", true);
+        // Do not use GuildMember.manageable here as the selection gate. It is a
+        // convenience cache/property and can be false for otherwise valid members
+        // while the member's role hierarchy is still directly actionable. Apply
+        // the real Discord hierarchy rules, then let Discord report any remaining
+        // per-member rejection.
+        const candidates = [...members.values()].filter((member) => {
+          if (member.user.bot || member.id === interaction.guild!.ownerId) return false;
+          if (member.roles.highest.position >= me.roles.highest.position) return false;
+          return action === "add" ? !member.roles.cache.has(role.id) : member.roles.cache.has(role.id);
+        });
+        const skipped = members.size - candidates.length;
         let changed = 0;
-        for (const member of interaction.guild.members.cache.values()) {
-          const result = action === "add" ? await member.roles.add(role).then(() => true).catch(() => false) : await member.roles.remove(role).then(() => true).catch(() => false);
-          if (result) changed += 1;
+        let failed = 0;
+        const failureReasons = new Set<string>();
+        for (let index = 0; index < candidates.length; index += 5) {
+          const batch = candidates.slice(index, index + 5);
+          const results = await Promise.allSettled(batch.map((member) => action === "add" ? member.roles.add(role, `Mass role ${action} by ${interaction.user.tag}`) : member.roles.remove(role, `Mass role ${action} by ${interaction.user.tag}`)));
+          for (const result of results) {
+            if (result.status === "fulfilled") changed += 1;
+            else {
+              failed += 1;
+              if (result.reason instanceof Error) failureReasons.add(result.reason.message.slice(0, 120));
+            }
+          }
         }
-        await log(interaction, `massrole-${action}`, interaction.user.id, `${role.name}: ${changed} members`);
-        return replyV2(interaction, { title: "Mass role complete", body: `${action === "add" ? "Added" : "Removed"} ${role} for **${changed}** cached members.` });
+        await log(interaction, `massrole-${action}`, interaction.user.id, `${role.name}: ${changed} changed, ${failed} failed, ${members.size} fetched`);
+        const failureNote = failed ? ` **${failed}** failed: ${[...failureReasons].slice(0, 2).join("; ") || "Discord rejected the request"}.` : "";
+        return editV2(interaction, { title: "Mass role complete", body: `${action === "add" ? "Added" : "Removed"} ${role} for **${changed}** of **${candidates.length}** eligible members from **${members.size.toLocaleString()}** fetched.${skipped ? ` Skipped **${skipped}** members because they were bots, already had the role, were the server owner, or were above my role.` : ""}${failureNote}` });
       }
       if (["modlog", "history", "notes", "case", "cases"].includes(command)) {
         const limit = interaction.options.getInteger("limit") ?? 10;
@@ -155,7 +185,9 @@ export default {
       }
       throw new Error(`Unknown moderation operation: ${command}`);
     } catch (error) {
-      await replyV2(interaction, { title: "Moderation command failed", body: error instanceof Error ? error.message : "Discord rejected the operation.", ephemeral: true });
+      const response = { title: "Moderation command failed", body: error instanceof Error ? error.message : "Discord rejected the operation.", ephemeral: true };
+      if (interaction.deferred || interaction.replied) await editV2(interaction, response);
+      else await replyV2(interaction, response);
     }
   },
 };

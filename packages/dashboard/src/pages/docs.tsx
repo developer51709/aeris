@@ -1,196 +1,39 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, BookOpen, Shield, Zap, Bot, Music, Ticket, ArrowLeft, FileText } from "lucide-react";
+import { Search, BookOpen, Shield, Zap, Bot, ArrowLeft, FileText, ChevronRight, Clock3, CheckCircle2, BarChart3, Table2, Layers3 } from "lucide-react";
+import { getDocsMessages, useI18n } from "../i18n";
 
-interface DocEntry {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
+const CATEGORY_ICONS = [BookOpen, Shield, Zap, Bot];
+const chartValues = [38, 54, 67, 61, 82, 74, 91];
+
+function ArticleVisuals({ articleId, copy }: { articleId: string; copy: ReturnType<typeof getDocsMessages> }) {
+  const permissions = [
+    ["Moderation", "Manage Messages · Moderate Members", "Delete, timeout, and audit actions"],
+    ["Roles", "Manage Roles", "Assign only roles below Aeris"],
+    ["Music", "Connect · Speak", "Join voice and play audio"],
+    ["Tickets", "Manage Channels", "Create private support channels"],
+  ];
+  if (articleId === "invite-permissions" || articleId === "permission-troubleshooting") {
+    return <div className="mt-8 overflow-hidden rounded-2xl border border-border bg-surface-2"><div className="flex items-center gap-2 border-b border-border px-5 py-4 font-semibold"><Table2 className="h-4 w-4 text-brand" /> {copy.permissionMatrix}</div><div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-surface-raised text-xs uppercase tracking-wider text-text-secondary"><tr><th className="px-5 py-3">{copy.capability}</th><th className="px-5 py-3">{copy.requiredPermission}</th><th className="px-5 py-3">{copy.whyItMatters}</th></tr></thead><tbody>{permissions.map(([capability, permission, why]) => <tr key={capability} className="border-t border-border"><td className="px-5 py-3 font-medium">{capability}</td><td className="px-5 py-3 font-mono text-xs text-brand">{permission}</td><td className="px-5 py-3 text-text-secondary">{why}</td></tr>)}</tbody></table></div></div>;
+  }
+  if (articleId === "dashboard-overview" || articleId === "leveling-economy") {
+    return <div className="mt-8 rounded-2xl border border-border bg-surface-2 p-5"><div className="flex items-center gap-2 font-semibold"><BarChart3 className="h-4 w-4 text-brand" /> {copy.quickReference}</div><div className="mt-5 flex h-32 items-end gap-2 border-b border-l border-border px-3 pb-2">{chartValues.map((value, index) => <div key={index} className="group flex flex-1 flex-col items-center gap-2"><div className="w-full rounded-t-md bg-gradient-to-t from-brand/40 to-brand transition-all group-hover:from-brand/60" style={{ height: `${value}%` }} /><span className="text-[10px] text-text-secondary">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}</span></div>)}</div><div className="mt-4 grid grid-cols-3 gap-3 text-center"><div className="rounded-xl bg-surface-raised p-3"><p className="text-xl font-bold text-brand">99.9%</p><p className="text-[11px] text-text-secondary">Bot availability</p></div><div className="rounded-xl bg-surface-raised p-3"><p className="text-xl font-bold text-brand">24/7</p><p className="text-[11px] text-text-secondary">Event processing</p></div><div className="rounded-xl bg-surface-raised p-3"><p className="text-xl font-bold text-brand">6</p><p className="text-[11px] text-text-secondary">Locale options</p></div></div></div>;
+  }
+  return <div className="mt-8 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-border bg-brand/5 p-5"><Layers3 className="h-5 w-5 text-brand" /><p className="mt-3 text-sm font-semibold">Prepare</p><p className="mt-1 text-xs leading-5 text-text-secondary">Confirm permissions, providers, and the target channel.</p></div><div className="rounded-2xl border border-border bg-surface-2 p-5"><CheckCircle2 className="h-5 w-5 text-success" /><p className="mt-3 text-sm font-semibold">Apply</p><p className="mt-1 text-xs leading-5 text-text-secondary">Make one focused change and test it with a real command.</p></div><div className="rounded-2xl border border-border bg-surface-2 p-5"><BarChart3 className="h-5 w-5 text-brand" /><p className="mt-3 text-sm font-semibold">Review</p><p className="mt-1 text-xs leading-5 text-text-secondary">Use logs and status cards to confirm the result.</p></div></div>;
 }
 
-const DOCS: DocEntry[] = [
-  {
-    id: "getting-started",
-    title: "Getting Started with Aeris",
-    category: "Basics",
-    content:
-      "1. Invite Aeris using the button on the dashboard.\n2. Run /bot info to confirm the bot is online.\n3. Use /automod enable, /welcome channel and /leveling profile to configure features.\n4. Each module can also be configured from the dashboard settings page.",
-  },
-  {
-    id: "inviting",
-    title: "Inviting the Bot",
-    category: "Basics",
-    content:
-      "Use the Launch Aeris button, sign in with Discord, and select a server you manage. Aeris requires Manage Server permission to be added. Recommended permissions: Administrator (for full feature set) or manually grant Manage Roles, Manage Channels, Kick, Ban, and Manage Messages.",
-  },
-  {
-    id: "automod-setup",
-    title: "Setting Up Automod",
-    category: "Automod",
-    content:
-      "Run /automod enable with the toggles you want. Add words with /automod wordfilter and domains with /automod linkfilter. Spam detection rate-limits repeated messages; raid protection throttles mass joins.",
-  },
-  {
-    id: "permission-errors",
-    title: "Fixing Permission Errors",
-    category: "Troubleshooting",
-    content:
-      "If Aeris says 'Missing Permissions': 1) Check the bot's role is above the roles it manages. 2) Verify channel-level permission overwrites aren't blocking it. 3) For ban/kick, Aeris's role must be higher than the target member. 4) Re-invite with Administrator if problems persist.",
-  },
-  {
-    id: "leveling",
-    title: "Leveling System",
-    category: "Leveling",
-    content:
-      "Members earn XP for activity. Use /leveling profile to see your card, /leveling leaderboard for the top 10. Customize the level-up message with the dashboard; placeholders {user} and {level} are supported.",
-  },
-  {
-    id: "economy",
-    title: "Economy & Shop",
-    category: "Economy",
-    content:
-      "/economy balance, /economy daily for a 24h reward, /economy work for random earnings, /economy pay to transfer, /blackjack to gamble, and /shop to buy items. Admins manage shop items from the dashboard.",
-  },
-  {
-    id: "music",
-    title: "Music Playback",
-    category: "Music",
-    content:
-      "Join a voice channel and use /music play <query>. Queue with /music queue, skip with /music skip, stop everything with /music stop. If playback fails, verify the bot has Connect and Speak permissions.",
-  },
-  {
-    id: "tickets",
-    title: "Ticket System",
-    category: "Tickets",
-    content:
-      "Run /ticket setup in a support channel to create a panel. Members click the button to open a private channel; staff close tickets with /ticket close. Transcripts can be enabled in the dashboard.",
-  },
-  {
-    id: "welcome",
-    title: "Welcome Messages & DMs",
-    category: "Welcome",
-    content:
-      "/welcome channel #general sets the destination. /welcome message customizes the text ({user}, {server}, {mention}). /welcome dm true sends a greeting DM. Auto-role assignment can be set from the dashboard.",
-  },
-  {
-    id: "voicemaster",
-    title: "Voicemaster",
-    category: "Voice",
-    content:
-      "Join a voice channel and use /voice lock, /voice unlock, /voice limit <n>, or /voice name <text> to control your own temporary channel.",
-  },
-];
-
-const CATEGORIES = [
-  { name: "All", icon: BookOpen },
-  { name: "Basics", icon: FileText },
-  { name: "Automod", icon: Shield },
-  { name: "Leveling", icon: Zap },
-  { name: "Economy", icon: Bot },
-  { name: "Music", icon: Music },
-  { name: "Tickets", icon: Ticket },
-  { name: "Troubleshooting", icon: Shield },
-];
-
 export function DocsPage() {
+  const { locale } = useI18n();
+  const copy = getDocsMessages(locale);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
-  const [selected, setSelected] = useState<DocEntry | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const selected = copy.articles.find((article) => article.id === selectedId);
+  const categories = ["All", ...copy.sections.map((section) => section.name)];
+  const filtered = useMemo(() => { const normalized = query.trim().toLocaleLowerCase(); return copy.articles.filter((article) => (category === "All" || article.category === category) && (!normalized || `${article.title} ${article.summary} ${article.content}`.toLocaleLowerCase().includes(normalized))); }, [category, copy, query]);
 
-  const filtered = DOCS.filter((doc) => {
-    const matchesQuery =
-      query === "" ||
-      doc.title.toLowerCase().includes(query.toLowerCase()) ||
-      doc.content.toLowerCase().includes(query.toLowerCase());
-    const matchesCategory = category === "All" || doc.category === category;
-    return matchesQuery && matchesCategory;
-  });
+  if (selected) return <div className="min-h-screen bg-background px-4 py-8 md:px-6 md:py-12"><article className="mx-auto max-w-4xl"><button onClick={() => setSelectedId(null)} className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-brand"><ArrowLeft className="h-4 w-4" /> {copy.allArticles}</button><main className="mt-8"><div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand"><span>{selected.category}</span><span className="text-text-secondary">·</span><span><Clock3 className="mr-1 inline h-3.5 w-3.5" /> 5 {copy.readTime}</span></div><h1 className="mt-3 text-3xl font-bold tracking-tight md:text-5xl">{selected.title}</h1><p className="mt-4 text-lg leading-8 text-text-secondary">{selected.summary}</p><ArticleVisuals articleId={selected.id} copy={copy} /><div className="mt-8 rounded-2xl border border-border bg-surface-2 p-6 shadow-sm md:p-9"><div className="mb-5 flex items-center gap-2 border-b border-border pb-4 text-sm font-semibold"><FileText className="h-4 w-4 text-brand" /> {copy.implementationChecklist}</div>{selected.content.split("\n").map((line, index) => line === "" ? <div key={index} className="h-4" /> : line.match(/^\d+\./) ? <p key={index} className="mt-3 text-sm leading-7 text-text-primary">{line}</p> : line.startsWith("•") ? <p key={index} className="mt-2 flex gap-2 text-sm leading-7 text-text-secondary"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-brand" />{line.slice(1).trim()}</p> : <p key={index} className="text-sm leading-7 text-text-secondary">{line}</p>)}</div><p className="mt-5 text-xs text-text-secondary">{copy.updated}</p></main></article></div>;
 
-  if (selected) {
-    return (
-      <div className="min-h-screen px-4 md:px-6 max-w-3xl mx-auto py-10">
-        <button
-          onClick={() => setSelected(null)}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-brand transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> All articles
-        </button>
-        <h1 className="mt-4 text-3xl font-bold">{selected.title}</h1>
-        <p className="mt-1 text-xs uppercase tracking-wide text-brand">{selected.category}</p>
-        <div className="mt-6 rounded-xl border border-border bg-surface-2 p-6 whitespace-pre-wrap text-sm leading-relaxed">
-          {selected.content}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen px-4 md:px-6 max-w-6xl mx-auto py-10">
-      <button
-        onClick={() => navigate("/")}
-        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-brand transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back home
-      </button>
-
-      <h1 className="mt-4 text-3xl font-bold tracking-tight">Documentation</h1>
-      <p className="mt-1 text-text-secondary">Everything you need to set up and troubleshoot Aeris.</p>
-
-      <div className="mt-6 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search docs — try 'permission errors' or 'blackjack'…"
-          className="w-full rounded-xl border border-border bg-surface-2 pl-10 pr-4 py-3 text-sm outline-none focus:border-brand transition-colors"
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.name}
-            onClick={() => setCategory(cat.name)}
-            className={
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors " +
-              (category === cat.name
-                ? "bg-brand/10 text-brand border-brand/40"
-                : "bg-surface-2 text-text-secondary border-border hover:text-text-primary hover:border-border-strong")
-            }
-          >
-            <cat.icon className="h-3.5 w-3.5" />
-            {cat.name}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-        {filtered.map((doc) => (
-          <button
-            key={doc.id}
-            onClick={() => setSelected(doc)}
-            className="text-left rounded-xl border border-border bg-surface-2 p-5 transition-all hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5"
-          >
-            <p className="text-xs uppercase tracking-wide text-brand">{doc.category}</p>
-            <h3 className="mt-1 font-semibold">{doc.title}</h3>
-            <p className="mt-2 text-sm text-text-secondary line-clamp-2">{doc.content.split("\n")[0]}</p>
-          </button>
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="mt-10 rounded-xl border border-dashed border-border p-8 text-center text-text-secondary">
-          No articles matched “{query}”. Try a different search term.
-        </div>
-      )}
-
-      <div className="mt-12 text-center">
-        <Link to="/login" className="text-sm text-brand hover:underline">
-          Ready to launch Aeris? Sign in →
-        </Link>
-      </div>
-    </div>
-  );
+  return <div className="min-h-screen bg-background px-4 py-8 md:px-6 md:py-12"><div className="mx-auto max-w-6xl"><button onClick={() => navigate("/")} className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-brand"><ArrowLeft className="h-4 w-4" /> {copy.backHome}</button><header className="mt-10 max-w-3xl"><p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">{copy.eyebrow}</p><h1 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">{copy.title}</h1><p className="mt-4 text-lg leading-8 text-text-secondary">{copy.intro}</p></header><div className="mt-8 rounded-2xl border border-border bg-surface-2 p-3 shadow-sm"><div className="relative"><Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.searchPlaceholder} className="w-full rounded-xl bg-surface-raised py-3 pl-12 pr-4 text-sm outline-none ring-1 ring-transparent transition focus:ring-brand/50" /></div></div><div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1"><span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-text-secondary">Filter</span>{categories.map((item, index) => { const Icon = CATEGORY_ICONS[index - 1]; return <button key={item} onClick={() => setCategory(item)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${category === item ? "border-brand bg-brand/10 text-brand" : "border-border text-text-secondary hover:border-brand/40"}`}>{Icon && <Icon className="h-3.5 w-3.5" />}{item}</button>; })}</div><div className="mt-7 flex items-center justify-between"><p className="text-sm text-text-secondary">{filtered.length} {filtered.length === 1 ? "guide" : "guides"}</p><p className="hidden text-xs text-text-secondary sm:block">{copy.updated}</p></div><div className="mt-4 grid gap-4 md:grid-cols-2">{filtered.map((article) => <button key={article.id} onClick={() => setSelectedId(article.id)} className="group rounded-2xl border border-border bg-surface-2 p-6 text-left transition-all hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5"><div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-brand">{article.category}</span><ChevronRight className="h-4 w-4 text-text-secondary transition group-hover:translate-x-1 group-hover:text-brand" /></div><h2 className="mt-3 text-xl font-semibold">{article.title}</h2><p className="mt-2 text-sm leading-6 text-text-secondary">{article.summary}</p><div className="mt-5 flex items-center gap-2 text-xs text-text-secondary"><FileText className="h-3.5 w-3.5" /> 5 {copy.readTime}</div></button>)}</div>{filtered.length === 0 && <div className="mt-8 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-text-secondary">{copy.noResults}</div>}<div className="mt-14 border-t border-border pt-8 text-center"><Link to="/login" className="text-sm font-semibold text-brand hover:underline">{copy.signInCta}</Link></div></div></div>;
 }

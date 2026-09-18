@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./env.js";
 
 import { Client, GatewayIntentBits, Partials, Events } from "discord.js";
 import { prisma } from "@aeris/shared";

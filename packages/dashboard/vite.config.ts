@@ -2,6 +2,19 @@ import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { readFileSync } from "node:fs";
+import dotenv from "dotenv";
+
+function parseProjectEnv(fileName: string) {
+  try { return dotenv.parse(readFileSync(path.resolve(__dirname, "../../", fileName))); } catch { return {}; }
+}
+const baseEnv = parseProjectEnv(".env");
+const localEnv = parseProjectEnv(".env.local");
+for (const key of new Set([...Object.keys(baseEnv), ...Object.keys(localEnv)])) {
+  if (process.env[key] !== undefined && process.env[key] !== "") continue;
+  const value = localEnv[key]?.trim() !== "" ? localEnv[key] : baseEnv[key];
+  if (value?.trim()) process.env[key] = value;
+}
 
 export default defineConfig({
   plugins: [

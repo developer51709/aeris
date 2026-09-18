@@ -7,11 +7,13 @@ import {
   LogOut,
   Menu,
   Moon,
+  Languages,
   Settings,
   Sun,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { api, authApi } from "../lib/api";
+import { LOCALE_LABELS, SUPPORTED_LOCALES, useI18n } from "../i18n";
 
 type Theme = "light" | "dark";
 
@@ -20,6 +22,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [botAvatar, setBotAvatar] = useState<string | null>(null);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const { locale, setLocale, t } = useI18n();
 
   useEffect(() => {
     api.get("/bot-profile").then((data) => {
@@ -58,10 +62,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const links: { to: string; icon: typeof Settings; label: string; end?: boolean }[] = [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
-    { to: "/dashboard/guilds", icon: Settings, label: "Servers" },
-    { to: "/dashboard/integrations", icon: Gamepad2, label: "Integrations" },
-    { to: "/docs", icon: BookOpen, label: "Docs" },
+    { to: "/dashboard", icon: LayoutDashboard, label: t.overview, end: true },
+    { to: "/dashboard/guilds", icon: Settings, label: t.servers },
+    { to: "/dashboard/integrations", icon: Gamepad2, label: t.integrations },
+    { to: "/docs", icon: BookOpen, label: t.docs },
   ];
 
   async function signOut() {
@@ -138,12 +142,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className="hidden sm:inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-brand transition-colors disabled:opacity-60"
             >
               <LogOut className="h-4 w-4" />
-              {loggingOut ? "Signing out…" : "Sign out"}
+              {loggingOut ? t.signingOut : t.signOut}
             </button>
             <button
               className="md:hidden w-9 h-9 rounded-full border border-border bg-surface-2 flex items-center justify-center text-text-secondary hover:text-text-primary hover:border-border-strong transition-colors"
               onClick={() => setMobile((m) => !m)}
-              aria-label="Toggle menu"
+              aria-label={t.toggleMenu}
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -178,7 +182,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-brand hover:bg-surface-2 transition-colors disabled:opacity-60"
             >
               <LogOut className="h-4 w-4" />
-              {loggingOut ? "Signing out…" : "Sign out"}
+              {loggingOut ? t.signingOut : t.signOut}
             </button>
           </nav>
         )}
@@ -188,8 +192,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
       </main>
 
-      <footer className="border-t border-border py-4 px-4 md:px-6 text-xs text-text-secondary text-center">
-        Aeris · Discord Bot · Made with care
+      <footer className="relative border-t border-border py-4 px-4 md:px-6 text-xs text-text-secondary">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <span>{t.madeWithCare}</span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setLanguageOpen((open) => !open)}
+              aria-expanded={languageOpen}
+              aria-label={t.chooseLanguage}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-text-secondary transition-colors hover:border-brand hover:text-brand"
+            >
+              <Languages className="h-3.5 w-3.5" />
+              <span>{LOCALE_LABELS[locale]}</span>
+            </button>
+            {languageOpen && (
+              <div className="absolute bottom-full right-0 z-50 mb-2 min-w-40 rounded-xl border border-border bg-surface-raised p-1.5 text-left shadow-lg">
+                <p className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">{t.language}</p>
+                {SUPPORTED_LOCALES.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => { setLocale(item); setLanguageOpen(false); }}
+                    className={cn("block w-full rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-brand/10 hover:text-brand", locale === item && "bg-brand/10 text-brand font-semibold")}
+                  >
+                    {LOCALE_LABELS[item]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </footer>
     </div>
   );

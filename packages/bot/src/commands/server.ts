@@ -29,15 +29,19 @@ export default {
     const command = interaction.options.getSubcommand();
     const value = interaction.options.getString("value");
     try {
-      if (command === "settings") return replyV2(interaction, { title: "Server settings", body: [`**Name:** ${guild.name}`, `**ID:** \`${guild.id}\``, `**Owner:** <@${guild.ownerId}>`, `**Locale:** ${process.env.DISCORD_LOCALE ?? "en-US"}`, `**Prefix:** ${process.env.DISCORD_PREFIX ?? "!"}`].join("\n") });
+      if (command === "settings") return replyV2(interaction, { title: "Server settings", body: [`**Name:** ${guild.name}`, `**ID:** \`${guild.id}\``, `**Owner:** <@${guild.ownerId}>`, `**Locale:** ${(await prisma.guild.findUnique({ where: { id: guild.id }, select: { locale: true } }))?.locale ?? "en"}`, `**Prefix:** ${process.env.DISCORD_PREFIX ?? "!"}`].join("\n") });
       if (["prefix", "locale", "timezone"].includes(command)) {
         if (value) {
           if (!has(interaction, PermissionFlagsBits.ManageGuild)) throw new Error("I need Manage Guild to change server configuration.");
           if (command === "prefix") process.env.DISCORD_PREFIX = value;
-          if (command === "locale") process.env.DISCORD_LOCALE = value;
+          if (command === "locale") {
+            const locale = value.toLowerCase().split("-")[0];
+            if (!["en", "es", "de", "fr", "hi", "ru"].includes(locale)) throw new Error("Supported languages: en, es, de, fr, hi, ru.");
+            await prisma.guild.update({ where: { id: guild.id }, data: { locale } });
+          }
           if (command === "timezone") process.env.DISCORD_TIMEZONE = value;
         }
-        return replyV2(interaction, { title: `${command} configuration`, body: `Current ${command}: **${command === "prefix" ? process.env.DISCORD_PREFIX ?? "!" : command === "locale" ? process.env.DISCORD_LOCALE ?? "en-US" : process.env.DISCORD_TIMEZONE ?? "UTC"}**${value ? "\n\nSaved for this bot process." : ""}` });
+        return replyV2(interaction, { title: `${command} configuration`, body: `Current ${command}: **${command === "prefix" ? process.env.DISCORD_PREFIX ?? "!" : command === "locale" ? (await prisma.guild.findUnique({ where: { id: guild.id }, select: { locale: true } }))?.locale ?? "en" : process.env.DISCORD_TIMEZONE ?? "UTC"}**${value ? "\n\nSaved for this bot process." : ""}` });
       }
       if (command === "channels") return replyV2(interaction, { title: "Server channels", body: guild.channels.cache.sort((a, b) => ((a as { position?: number }).position ?? 0) - ((b as { position?: number }).position ?? 0)).map((channel) => `${channel.type === ChannelType.GuildCategory ? "📁" : "#️⃣"} ${channel.name} — \`${channel.id}\``).slice(0, 75).join("\n") || "No cached channels." });
       if (command === "roles") return replyV2(interaction, { title: "Server roles", body: guild.roles.cache.filter((role) => role.id !== guild.id).sort((a, b) => b.position - a.position).map((role) => `${role} — ${role.members.size} members`).slice(0, 75).join("\n") || "No custom roles." });

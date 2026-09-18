@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bot, RefreshCw, Users, Settings, BarChart3, Wallet } from "lucide-react";
 import { api, ApiError } from "../lib/api";
+import { DASHBOARD_EXTRA, useI18n } from "../i18n";
 
 interface Guild {
   id: string;
@@ -14,6 +15,8 @@ export function GuildList() {
   const [guilds, setGuilds] = useState<Guild[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { locale } = useI18n();
+  const copy = DASHBOARD_EXTRA[locale];
 
   useEffect(() => {
     let cancelled = false;
@@ -65,11 +68,9 @@ export function GuildList() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-brand">Server management</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Your Servers</h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            Select a server to manage its settings
-          </p>
+          <p className="text-sm font-medium text-brand">{copy.serverManagement}</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">{copy.yourServers}</h1>
+          <p className="mt-1 text-sm text-text-secondary">{copy.selectServer}</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-text-secondary">
           <Bot className="h-4 w-4" />
@@ -80,7 +81,7 @@ export function GuildList() {
       {guilds.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-border-strong bg-surface-2 p-10 text-center">
           <Bot className="mx-auto h-9 w-9 text-text-secondary" />
-          <h2 className="mt-4 text-lg font-semibold">No managed servers yet</h2>
+          <h2 className="mt-4 text-lg font-semibold">{copy.noServers}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
             Connect Aeris to a Discord server you manage, then refresh this page.
           </p>

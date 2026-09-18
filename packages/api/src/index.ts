@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./env.js";
 
 import express from "express";
 import cors from "cors";
@@ -49,6 +49,35 @@ app.use(
     sameSite: "lax",
   }),
 );
+
+// Restore the durable login cookie before any dashboard or auth route runs.
+// The dashboard loads /auth/me and /api/guilds concurrently, so relying on
+// /auth/me to restore the session creates a race where /api/guilds can see an
+// unauthenticated request and the UI incorrectly renders zero servers.
+app.use(async (req, _res, next) => {
+  const currentUser = (req.session as any)?.user;
+  const persistentToken = (req as any).cookies?.["aeris.login"] as string | undefined;
+  if (currentUser?.id || !persistentToken) {
+    next();
+    return;
+  }
+
+  try {
+    const stored = await prisma.loginSession.findUnique({ where: { token: persistentToken } });
+    if (stored && stored.expiresAt > new Date()) {
+      (req.session as any).user = {
+        id: stored.userId,
+        username: stored.username,
+        avatar: stored.avatar,
+        guildIds: JSON.parse(stored.guildIds || "[]"),
+        accessToken: undefined,
+      };
+    }
+  } catch (error) {
+    console.error("Persistent session middleware restore failed:", error);
+  }
+  next();
+});
 
 app.use("/auth", authRoutes);
 app.use("/api", dashboardRoutes);

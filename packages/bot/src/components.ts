@@ -9,6 +9,7 @@ import {
   TextDisplayBuilder,
   AttachmentBuilder,
 } from "discord.js";
+import { getGuildLocale, translateText } from "./locale.js";
 
 export interface V2ResponseOptions {
   title?: string;
@@ -52,9 +53,15 @@ export async function replyV2(
   interaction: ChatInputCommandInteraction,
   options: V2ResponseOptions,
 ) {
+  const locale = await getGuildLocale(interaction.guildId);
+  const localized = {
+    ...options,
+    title: options.title ? translateText(options.title, locale) : undefined,
+    body: translateText(options.body, locale),
+  };
   return interaction.reply({
     flags: MessageFlags.IsComponentsV2 | (options.ephemeral ? MessageFlags.Ephemeral : 0),
-    components: [containerResponse(options)],
+    components: [containerResponse(localized)],
     ...(options.files ? { files: options.files } : {}),
   });
 }
@@ -63,9 +70,15 @@ export async function editV2(
   interaction: ChatInputCommandInteraction,
   options: V2ResponseOptions,
 ) {
+  const locale = await getGuildLocale(interaction.guildId);
+  const localized = {
+    ...options,
+    title: options.title ? translateText(options.title, locale) : undefined,
+    body: translateText(options.body, locale),
+  };
   return interaction.editReply({
     flags: MessageFlags.IsComponentsV2,
-    components: [containerResponse(options)],
+    components: [containerResponse(localized)],
     ...(options.files ? { files: options.files } : {}),
   });
 }
