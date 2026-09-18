@@ -46,7 +46,7 @@ export function Integrations() {
     <div>
       <p className="text-sm font-medium text-brand">Connected tools</p>
       <h1 className="mt-1 text-3xl font-bold tracking-tight">Integrations</h1>
-      <p className="mt-1 text-sm text-text-secondary">Run live Minecraft and Roblox lookups from the dashboard.</p>
+      <p className="mt-1 text-sm text-text-secondary">Run the same provider-backed lookups and media tools that power Aeris commands.</p>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-4">
         <form onSubmit={(event) => lookup(event, `/lookups/minecraft/player/${encodeURIComponent(minecraftPlayer)}`)} className="rounded-2xl border border-border bg-surface-2 p-5">

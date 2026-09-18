@@ -19,6 +19,15 @@ interface Stats {
   automodConfigured?: number;
 }
 
+interface BotStatus {
+  online?: boolean;
+  guildCount?: number;
+  memberCount?: number;
+  aiProviderCount?: number;
+  lavalinkNodeCount?: number;
+  checkedAt?: string;
+}
+
 function number(value: number | undefined, loading = false) {
   return loading ? "—" : (value ?? 0).toLocaleString();
 }
@@ -29,6 +38,7 @@ export function Overview() {
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -37,9 +47,10 @@ export function Overview() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api
-      .get("/guilds")
-      .then((data) => {
+    Promise.all([api.get("/guilds"), api.get("/status")])
+      .then(([guildData, statusData]) => {
+        setBotStatus(statusData as BotStatus);
+        const data = guildData;
         if (cancelled) return;
         const nextGuilds = Array.isArray(data) ? (data as Guild[]) : [];
         setGuilds(nextGuilds);
@@ -142,6 +153,7 @@ export function Overview() {
         <div className="flex items-center gap-2 text-sm text-text-secondary">
           <Bot className="h-4 w-4" />
           {guilds.length} server{guilds.length !== 1 ? "s" : ""}
+          {botStatus && <span className="ml-2 text-xs text-text-secondary">· {botStatus.aiProviderCount ?? 0} AI · {botStatus.lavalinkNodeCount ?? 0} Lavalink</span>}
         </div>
       </div>
 
@@ -171,7 +183,7 @@ export function Overview() {
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold">{active?.name ?? "Unnamed server"}</h2>
                   <p className="text-sm text-text-secondary">
-                    {statsError ?? "Aeris is active in this server"}
+                    {statsError ?? (botStatus?.online === false ? "Bot status unavailable" : "Aeris is active in this server")}
                   </p>
                 </div>
               </div>

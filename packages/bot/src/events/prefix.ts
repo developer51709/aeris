@@ -1,5 +1,7 @@
 import { Message, MessageFlags, PermissionFlagsBits } from "discord.js";
 import { containerResponse } from "../components.js";
+import { prisma } from "@aeris/shared";
+import { loadTrack } from "../music/lavalink.js";
 
 const random = <T>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
@@ -73,6 +75,44 @@ export async function onPrefixMessage(message: Message) {
         ? `AI: ${process.env.AI_API_KEY ? "configured" : "not configured"} · TMDB: ${process.env.TMDB_API_KEY ? "configured" : "not configured"} · Lavalink: ${process.env.LAVALINK_NODES || process.env.LAVALINK_NODE_URLS ? "configured" : "not configured"}`
         : `Guilds: ${message.client.guilds.cache.size.toLocaleString()}\nCached members: ${members.toLocaleString()}\nLatency: ${message.client.ws.ping}ms\nUptime: ${Math.floor(process.uptime()).toLocaleString()} seconds`;
     await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: `Admin · ${subcommand}`, body })] });
+    return;
+  }
+
+  if (root === "media") {
+    const subcommand = tokens.shift()?.toLowerCase() ?? "nowplaying";
+    const guildId = message.guild.id;
+    const existing = await prisma.musicQueue.findUnique({ where: { id: guildId } });
+    let queue: string[] = [];
+    try { queue = existing?.queue ? JSON.parse(existing.queue) as string[] : []; } catch { queue = []; }
+    if (subcommand === "nowplaying") {
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · nowplaying", body: existing?.nowPlaying ? `**${existing.nowPlaying}**\\n${queue.length} queued track(s).` : "Nothing is currently playing." })] });
+      return;
+    }
+    if (subcommand === "clear") {
+      await prisma.musicQueue.upsert({ where: { id: guildId }, create: { id: guildId, guildId, nowPlaying: null, queue: "[]" }, update: { nowPlaying: null, queue: "[]" } });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · clear", body: "Playback state and the queue were cleared." })] });
+      return;
+    }
+    if (subcommand === "shuffle") {
+      for (let index = queue.length - 1; index > 0; index -= 1) { const swap = Math.floor(Math.random() * (index + 1)); [queue[index], queue[swap]] = [queue[swap], queue[index]]; }
+      await prisma.musicQueue.upsert({ where: { id: guildId }, create: { id: guildId, guildId, nowPlaying: existing?.nowPlaying ?? null, queue: JSON.stringify(queue) }, update: { queue: JSON.stringify(queue) } });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · shuffle", body: `Shuffled **${queue.length}** queued tracks.` })] });
+      return;
+    }
+    const query = tokens.join(" ").trim();
+    if (!query) {
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media query required", body: `Usage: ${prefix}media play <song or URL>` })] });
+      return;
+    }
+    try {
+      const resolved = await loadTrack(query);
+      const title = resolved.track.info?.title ?? query;
+      const nextQueue = existing?.nowPlaying ? [...queue, title] : queue;
+      await prisma.musicQueue.upsert({ where: { id: guildId }, create: { id: guildId, guildId, nowPlaying: existing?.nowPlaying ?? title, queue: JSON.stringify(nextQueue) }, update: { nowPlaying: existing?.nowPlaying ?? title, queue: JSON.stringify(nextQueue) } });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · play", body: `Resolved **${title}** through Lavalink node **${resolved.node}**.` })] });
+    } catch (error) {
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media unavailable", body: error instanceof Error ? error.message : "All Lavalink nodes are unavailable." })] });
+    }
     return;
   }
 
