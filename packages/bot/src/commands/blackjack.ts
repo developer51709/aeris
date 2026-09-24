@@ -1,6 +1,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 type Card = { rank: string; suit: string };
 
@@ -46,6 +48,7 @@ export default {
       o.setName("bet").setDescription("Bet amount").setRequired(true).setMinValue(10),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const userId = interaction.user.id;
     const key = `${guildId}:${userId}`;
@@ -62,7 +65,8 @@ export default {
         .setColor(COLORS.danger)
         .setTitle("Insufficient Funds")
         .setDescription("You don't have enough coins for that bet.");
-      await interaction.reply({ embeds: [embed] });
+      localizeEmbed(embed, locale);
+    await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -123,6 +127,7 @@ export default {
         { name: "Payout", value: delta > 0 ? `+${delta.toLocaleString()}` : `${-bet}`, inline: true },
       );
 
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
   },
 };

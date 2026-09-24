@@ -5,6 +5,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -33,6 +35,7 @@ export default {
         .addStringOption((o) => o.setName("reason").setDescription("Reason").setRequired(true)),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
     const user = interaction.options.getUser("user")!;
@@ -51,6 +54,7 @@ export default {
           { name: "Moderator", value: `${interaction.user}`, inline: true },
           { name: "Reason", value: reason, inline: false },
         );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "kick") {
       const member = await interaction.guild?.members.fetch(user.id).catch(() => undefined);
@@ -66,6 +70,7 @@ export default {
           { name: "Moderator", value: `${interaction.user}`, inline: true },
           { name: "Reason", value: reason, inline: false },
         );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "warn") {
       await prisma.moderationLog.create({
@@ -79,6 +84,7 @@ export default {
           { name: "Moderator", value: `${interaction.user}`, inline: true },
           { name: "Reason", value: reason, inline: false },
         );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     }
   },

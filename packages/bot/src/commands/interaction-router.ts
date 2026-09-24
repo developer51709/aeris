@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction, Collection, MessageFlags, MessageContextMe
 import { contextCommands } from "./context.js";
 import { containerResponse } from "../components.js";
 import { loadCommandModules, RegisteredCommand } from "./registry.js";
+import { getGuildLocale, translateText } from "../locale.js";
 
 const handlers = new Collection<string, RegisteredCommand>();
 type ContextInteraction = UserContextMenuCommandInteraction | MessageContextMenuCommandInteraction;
@@ -92,9 +93,12 @@ export async function routeInteraction(interaction: ChatInputCommandInteraction)
     await handler.execute(interaction);
   } catch (error) {
     console.error(`Error in /${interaction.commandName}:`, error);
+    const locale = await getGuildLocale(interaction.guildId);
+    const title = translateText("Command error", locale);
+    const body = translateText("Something went wrong running that command.", locale);
     const payload = {
       flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-      components: [containerResponse({ title: "Command error", body: "Something went wrong running that command." })],
+      components: [containerResponse({ title, body })],
     };
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp(payload).catch(() => undefined);

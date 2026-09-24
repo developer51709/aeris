@@ -4,6 +4,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -25,6 +27,7 @@ export default {
       sub.setName("leaderboard").setDescription("Economy leaderboard"),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const userId = interaction.user.id;
     const key = `${guildId}:${userId}`;
@@ -47,7 +50,8 @@ export default {
             { name: "Bank", value: w.bank.toLocaleString(), inline: true },
             { name: "Total", value: (w.cash + w.bank).toLocaleString(), inline: true },
           );
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         break;
       }
       case "daily": {
@@ -61,7 +65,8 @@ export default {
             .setColor(COLORS.warning)
             .setTitle("⏳ Daily Reward")
             .setDescription(`You already claimed your daily reward. Come back in **${remaining}h**.`);
-          await interaction.reply({ embeds: [embed] });
+          localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
           return;
         }
         const settings = await prisma.economySettings.findUnique({ where: { guildId } });
@@ -74,7 +79,8 @@ export default {
           .setColor(COLORS.economy)
           .setTitle("🎁 Daily Reward")
           .setDescription(`You claimed **${amount.toLocaleString()}** coins!`);
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         break;
       }
       case "work": {
@@ -90,7 +96,8 @@ export default {
           .setColor(COLORS.economy)
           .setTitle("🛠️ Work")
           .setDescription(`You ${job} and earned **${earnings}** coins!`);
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         break;
       }
       case "pay": {
@@ -101,7 +108,8 @@ export default {
             .setColor(COLORS.danger)
             .setTitle("Invalid Payment")
             .setDescription("You can't pay yourself.");
-          await interaction.reply({ embeds: [embed] });
+          localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
           return;
         }
         const w = await getWallet();
@@ -110,7 +118,8 @@ export default {
             .setColor(COLORS.danger)
             .setTitle("Insufficient Funds")
             .setDescription("You don't have enough coins for this transfer.");
-          await interaction.reply({ embeds: [embed] });
+          localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
           return;
         }
         const targetKey = `${guildId}:${target.id}`;
@@ -127,7 +136,8 @@ export default {
           .setColor(COLORS.success)
           .setTitle("✅ Payment Sent")
           .setDescription(`Sent **${amount.toLocaleString()}** coins to ${target}.`);
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         break;
       }
       case "leaderboard": {
@@ -141,7 +151,8 @@ export default {
             .setColor(COLORS.neutral)
             .setTitle("💰 Economy Leaderboard")
             .setDescription("No economy data yet.");
-          await interaction.reply({ embeds: [embed] });
+          localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
           return;
         }
         const lines = rows.map(
@@ -154,7 +165,8 @@ export default {
           .setColor(COLORS.economy)
           .setTitle("💰 Economy Leaderboard")
           .setDescription(lines.join("\n"));
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         break;
       }
     }

@@ -4,6 +4,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -39,17 +41,18 @@ export default {
         ),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const subcommand = interaction.options.getSubcommand();
     const target = interaction.options.getUser("user") ?? interaction.user;
 
     switch (subcommand) {
       case "profile":
-        return handleProfile(interaction, guildId, target);
+        return handleProfile(interaction, guildId, target, locale);
       case "rank":
-        return handleRank(interaction, guildId, target);
+        return handleRank(interaction, guildId, target, locale);
       case "leaderboard":
-        return handleLeaderboard(interaction, guildId);
+        return handleLeaderboard(interaction, guildId, locale);
     }
   },
 };
@@ -58,6 +61,7 @@ async function handleProfile(
   interaction: ChatInputCommandInteraction,
   guildId: string,
   target: { id: string; username: string | null; avatar: string | null },
+  locale: import("../locale.js").BotLocale,
 ) {
   const data = await prisma.levelingData.findUnique({
     where: { id: `${guildId}:${target.id}` },
@@ -86,13 +90,15 @@ async function handleProfile(
     )
     .setThumbnail(avatarUrl);
 
-  await interaction.reply({ embeds: [embed] });
+  localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
 }
 
 async function handleRank(
   interaction: ChatInputCommandInteraction,
   guildId: string,
   target: { id: string; username: string | null },
+  locale: import("../locale.js").BotLocale,
 ) {
   const entries = await prisma
     .levelingData.findMany({
@@ -115,12 +121,14 @@ async function handleRank(
       { name: "Total XP", value: data ? data.totalXp.toLocaleString() : "—", inline: true },
     );
 
-  await interaction.reply({ embeds: [embed] });
+  localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
 }
 
 async function handleLeaderboard(
   interaction: ChatInputCommandInteraction,
   guildId: string,
+  locale: import("../locale.js").BotLocale,
 ) {
   const page = (interaction.options.getInteger("page") ?? 1) - 1;
   const entries = await prisma
@@ -136,7 +144,8 @@ async function handleLeaderboard(
       .setColor(COLORS.neutral)
       .setTitle("📈 Leaderboard")
       .setDescription(page === 0 ? "No one has earned XP yet." : "No entries on this page.");
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
     return;
   }
 
@@ -152,5 +161,6 @@ async function handleLeaderboard(
     .setDescription(lines.join("\n"))
     .setFooter({ text: `Page ${page + 1} of ${Math.ceil(entries.length / 10)}` });
 
-  await interaction.reply({ embeds: [embed] });
+  localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
 }

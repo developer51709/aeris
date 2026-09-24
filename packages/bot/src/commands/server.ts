@@ -1,6 +1,7 @@
 import { ChannelType, ChatInputCommandInteraction, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { replyV2 } from "../components.js";
+import { SUPPORTED_LOCALES } from "../locale.js";
 
 const names = ["settings", "prefix", "locale", "timezone", "channels", "roles", "permissions", "modules", "module", "logs", "log-channel", "welcome", "goodbye", "autorole", "autoroles", "rules", "verification", "vanity", "icon", "banner", "features", "backup", "backup-list", "backup-load", "health"] as const;
 const backups = new Map<string, { createdAt: number; channels: string[]; roles: string[] }>();
@@ -36,7 +37,7 @@ export default {
           if (command === "prefix") process.env.DISCORD_PREFIX = value;
           if (command === "locale") {
             const locale = value.toLowerCase().split("-")[0];
-            if (!["en", "es", "de", "fr", "hi", "ru"].includes(locale)) throw new Error("Supported languages: en, es, de, fr, hi, ru.");
+            if (!(SUPPORTED_LOCALES as readonly string[]).includes(locale)) throw new Error(`Supported languages: ${SUPPORTED_LOCALES.join(", ")}.`);
             await prisma.guild.update({ where: { id: guild.id }, data: { locale } });
           }
           if (command === "timezone") process.env.DISCORD_TIMEZONE = value;

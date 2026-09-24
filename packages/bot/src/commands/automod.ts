@@ -4,6 +4,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS, successEmbed } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -86,21 +88,22 @@ export default {
         ),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const subcommand = interaction.options.getSubcommand();
 
     switch (subcommand) {
       case "status":
-        await handleStatus(interaction, guildId);
+        await handleStatus(interaction, guildId, locale);
         break;
       case "enable":
-        await handleEnable(interaction, guildId);
+        await handleEnable(interaction, guildId, locale);
         break;
       case "wordfilter":
-        await handleWordFilter(interaction, guildId);
+        await handleWordFilter(interaction, guildId, locale);
         break;
       case "linkfilter":
-        await handleLinkFilter(interaction, guildId);
+        await handleLinkFilter(interaction, guildId, locale);
         break;
     }
   },
@@ -109,6 +112,7 @@ export default {
 async function handleStatus(
   interaction: ChatInputCommandInteraction,
   guildId: string,
+  locale: import("../locale.js").BotLocale,
 ) {
   const settings = await prisma
     .automodSettings.findUnique({ where: { guildId } })
@@ -129,12 +133,14 @@ async function handleStatus(
       { name: "Max Emotes", value: String(settings?.maxEmotes ?? 10), inline: true },
     );
 
-  await interaction.reply({ embeds: [embed] });
+  localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
 }
 
 async function handleEnable(
   interaction: ChatInputCommandInteraction,
   guildId: string,
+  locale: import("../locale.js").BotLocale,
 ) {
   const word = interaction.options.getBoolean("word_filter");
   const link = interaction.options.getBoolean("link_filter");
@@ -170,12 +176,14 @@ async function handleEnable(
     "Automod settings have been saved.",
   );
 
-  await interaction.reply({ embeds: [embed] });
+  localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
 }
 
 async function handleWordFilter(
   interaction: ChatInputCommandInteraction,
   guildId: string,
+  locale: import("../locale.js").BotLocale,
 ) {
   const word = interaction.options.getString("word")!;
   const action = interaction.options.getString("action")!;
@@ -197,7 +205,8 @@ async function handleWordFilter(
       "Word Filter Added",
       `Added **${word}** to the word filter list.`,
     );
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
   } else {
     const next = list.filter((w) => w !== word);
     await prisma.automodSettings.update({
@@ -208,13 +217,15 @@ async function handleWordFilter(
       "Word Filter Removed",
       `Removed **${word}** from the word filter list.`,
     );
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
   }
 }
 
 async function handleLinkFilter(
   interaction: ChatInputCommandInteraction,
   guildId: string,
+  locale: import("../locale.js").BotLocale,
 ) {
   const domain = interaction.options.getString("domain")!;
   const action = interaction.options.getString("action")!;
@@ -236,7 +247,8 @@ async function handleLinkFilter(
       "Link Filter Added",
       `Added **${domain}** to the link filter list.`,
     );
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
   } else {
     const next = list.filter((d) => d !== domain);
     await prisma.automodSettings.update({
@@ -247,6 +259,7 @@ async function handleLinkFilter(
       "Link Filter Removed",
       `Removed **${domain}** from the link filter list.`,
     );
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
   }
 }

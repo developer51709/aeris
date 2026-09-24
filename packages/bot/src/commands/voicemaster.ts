@@ -4,6 +4,8 @@ import {
   ChannelType,
 } from "discord.js";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,6 +24,7 @@ export default {
       ),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const member = interaction.guild?.members.cache.get(interaction.user.id);
     const channel = member?.voice.channel;
 
@@ -30,6 +33,7 @@ export default {
         .setColor(COLORS.danger)
         .setTitle("Not in Voice")
         .setDescription("Join a voice channel first.");
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
@@ -39,20 +43,20 @@ export default {
       case "lock":
         await channel.permissionOverwrites.edit(interaction.guild!.roles.everyone, { Connect: false });
         await interaction.reply({
-          embeds: [aerisEmbed().setColor(COLORS.warning).setTitle("🔒 Channel Locked").setDescription(`${channel} has been locked.`)],
+          embeds: [localizeEmbed(aerisEmbed().setColor(COLORS.warning).setTitle("🔒 Channel Locked").setDescription(`${channel} has been locked.`), locale)],
         });
         break;
       case "unlock":
         await channel.permissionOverwrites.edit(interaction.guild!.roles.everyone, { Connect: null });
         await interaction.reply({
-          embeds: [aerisEmbed().setColor(COLORS.success).setTitle("🔓 Channel Unlocked").setDescription(`${channel} has been unlocked.`)],
+          embeds: [localizeEmbed(aerisEmbed().setColor(COLORS.success).setTitle("🔓 Channel Unlocked").setDescription(`${channel} has been unlocked.`), locale)],
         });
         break;
       case "limit": {
         const count = interaction.options.getInteger("count")!;
         await channel.setUserLimit(count);
         await interaction.reply({
-          embeds: [aerisEmbed().setColor(COLORS.primary).setTitle("👥 User Limit Set").setDescription(`Maximum users set to **${count}**.`)],
+          embeds: [localizeEmbed(aerisEmbed().setColor(COLORS.primary).setTitle("👥 User Limit Set").setDescription(`Maximum users set to **${count}**.`), locale)],
         });
         break;
       }
@@ -60,7 +64,7 @@ export default {
         const newName = interaction.options.getString("name")!;
         await channel.setName(newName);
         await interaction.reply({
-          embeds: [aerisEmbed().setColor(COLORS.primary).setTitle("✏️ Channel Renamed").setDescription(`Channel renamed to **${newName}**.`)],
+          embeds: [localizeEmbed(aerisEmbed().setColor(COLORS.primary).setTitle("✏️ Channel Renamed").setDescription(`Channel renamed to **${newName}**.`), locale)],
         });
         break;
       }

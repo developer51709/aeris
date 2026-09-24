@@ -4,12 +4,15 @@ import {
   ButtonStyle,
   ChatInputCommandInteraction,
   ContainerBuilder,
+  EmbedBuilder,
   MediaGalleryBuilder,
   MessageFlags,
   TextDisplayBuilder,
   AttachmentBuilder,
 } from "discord.js";
 import { getGuildLocale, translateText } from "./locale.js";
+import type { BotLocale } from "./locales/types.js";
+import { localizeEmbed } from "./lib/embeds.js";
 
 export interface V2ResponseOptions {
   title?: string;
@@ -49,15 +52,23 @@ export function containerResponse(options: V2ResponseOptions): ContainerBuilder 
   return container;
 }
 
+/**
+ * Locale-aware V2 reply helpers.
+ * If `locale` is provided, that locale is used. Otherwise the guild's
+ * stored locale is fetched via `getGuildLocale(guildId)`. This lets
+ * callers that already fetched the locale (e.g., embed commands) reuse it
+ * and avoid an extra DB read.
+ */
 export async function replyV2(
   interaction: ChatInputCommandInteraction,
   options: V2ResponseOptions,
+  locale?: BotLocale,
 ) {
-  const locale = await getGuildLocale(interaction.guildId);
+  const resolved = locale ?? (await getGuildLocale(interaction.guildId));
   const localized = {
     ...options,
-    title: options.title ? translateText(options.title, locale) : undefined,
-    body: translateText(options.body, locale),
+    title: options.title ? translateText(options.title, resolved) : undefined,
+    body: translateText(options.body, resolved),
   };
   return interaction.reply({
     flags: MessageFlags.IsComponentsV2 | (options.ephemeral ? MessageFlags.Ephemeral : 0),
@@ -69,18 +80,34 @@ export async function replyV2(
 export async function editV2(
   interaction: ChatInputCommandInteraction,
   options: V2ResponseOptions,
+  locale?: BotLocale,
 ) {
-  const locale = await getGuildLocale(interaction.guildId);
+  const resolved = locale ?? (await getGuildLocale(interaction.guildId));
   const localized = {
     ...options,
-    title: options.title ? translateText(options.title, locale) : undefined,
-    body: translateText(options.body, locale),
+    title: options.title ? translateText(options.title, resolved) : undefined,
+    body: translateText(options.body, resolved),
   };
   return interaction.editReply({
     flags: MessageFlags.IsComponentsV2,
     components: [containerResponse(localized)],
     ...(options.files ? { files: options.files } : {}),
   });
+}
+
+/**
+ * Reply with a (localized) embed. The embed's title/description/fields/footer
+ * are translated via the modular locale folder before sending.
+ * Prefer V2 (`replyV2`) for new flows — this is for legacy embed commands.
+ */
+export async function replyEmbed(
+  interaction: ChatInputCommandInteraction,
+  embed: EmbedBuilder,
+  opts?: { ephemeral?: boolean; locale?: BotLocale },
+) {
+  const resolved = opts?.locale ?? (await getGuildLocale(interaction.guildId));
+  localizeEmbed(embed, resolved);
+  return interaction.reply({ embeds: [embed], ephemeral: opts?.ephemeral });
 }
 
 export function botInviteUrl() {

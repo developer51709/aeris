@@ -2,6 +2,7 @@ import { Message, MessageFlags, PermissionFlagsBits } from "discord.js";
 import { containerResponse } from "../components.js";
 import { prisma } from "@aeris/shared";
 import { loadTrack } from "../music/lavalink.js";
+import { getGuildLocale, translateText } from "../locale.js";
 
 const random = <T>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
@@ -37,6 +38,13 @@ for (const [root, children] of Object.entries(subcommands)) {
 
 export const prefixCommandCount = Object.keys(prefixCommands).length;
 
+function localized(title: string | undefined, body: string, locale: import("../locales/types.js").BotLocale) {
+  return containerResponse({
+    title: title ? translateText(title, locale) : undefined,
+    body: translateText(body, locale),
+  });
+}
+
 export async function onPrefixMessage(message: Message) {
   if (message.author.bot || !message.guild) return;
   const prefix = process.env.DISCORD_PREFIX ?? "!";
@@ -48,6 +56,8 @@ export async function onPrefixMessage(message: Message) {
   const key = [root, tokens[0]?.toLowerCase()].filter(Boolean).join(" ");
   const command = prefixCommands[key] ?? prefixCommands[root];
   if (!command) return;
+
+  const locale = await getGuildLocale(message.guildId);
 
   if (root === "fun" && ["coinflip", "dice", "joke", "fact", "fortune", "8ball"].includes(tokens[0]?.toLowerCase() ?? "")) {
     const subcommand = tokens[0]?.toLowerCase();
@@ -62,7 +72,7 @@ export async function onPrefixMessage(message: Message) {
             : subcommand === "fortune"
               ? random(["A small decision will open a big door.", "Your persistence is about to pay off."])
               : random(["Absolutely.", "Most likely.", "Ask again later."]);
-    await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: `Fun · ${subcommand}`, body })] });
+    await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized(`Fun · ${subcommand}`, body, locale)] });
     return;
   }
 
@@ -74,7 +84,7 @@ export async function onPrefixMessage(message: Message) {
       : subcommand === "integrations"
         ? `AI: ${process.env.AI_API_KEY ? "configured" : "not configured"} · TMDB: ${process.env.TMDB_API_KEY ? "configured" : "not configured"} · Lavalink: ${process.env.LAVALINK_NODES || process.env.LAVALINK_NODE_URLS ? "configured" : "not configured"}`
         : `Guilds: ${message.client.guilds.cache.size.toLocaleString()}\nCached members: ${members.toLocaleString()}\nLatency: ${message.client.ws.ping}ms\nUptime: ${Math.floor(process.uptime()).toLocaleString()} seconds`;
-    await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: `Admin · ${subcommand}`, body })] });
+    await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized(`Admin · ${subcommand}`, body, locale)] });
     return;
   }
 
@@ -85,23 +95,23 @@ export async function onPrefixMessage(message: Message) {
     let queue: string[] = [];
     try { queue = existing?.queue ? JSON.parse(existing.queue) as string[] : []; } catch { queue = []; }
     if (subcommand === "nowplaying") {
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · nowplaying", body: existing?.nowPlaying ? `**${existing.nowPlaying}**\\n${queue.length} queued track(s).` : "Nothing is currently playing." })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Media · nowplaying", existing?.nowPlaying ? `**${existing.nowPlaying}**\\n${queue.length} queued track(s).` : "Nothing is currently playing.", locale)] });
       return;
     }
     if (subcommand === "clear") {
       await prisma.musicQueue.upsert({ where: { id: guildId }, create: { id: guildId, guildId, nowPlaying: null, queue: "[]" }, update: { nowPlaying: null, queue: "[]" } });
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · clear", body: "Playback state and the queue were cleared." })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Media · clear", "Playback state and the queue were cleared.", locale)] });
       return;
     }
     if (subcommand === "shuffle") {
       for (let index = queue.length - 1; index > 0; index -= 1) { const swap = Math.floor(Math.random() * (index + 1)); [queue[index], queue[swap]] = [queue[swap], queue[index]]; }
       await prisma.musicQueue.upsert({ where: { id: guildId }, create: { id: guildId, guildId, nowPlaying: existing?.nowPlaying ?? null, queue: JSON.stringify(queue) }, update: { queue: JSON.stringify(queue) } });
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · shuffle", body: `Shuffled **${queue.length}** queued tracks.` })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Media · shuffle", `Shuffled **${queue.length}** queued tracks.`, locale)] });
       return;
     }
     const query = tokens.join(" ").trim();
     if (!query) {
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media query required", body: `Usage: ${prefix}media play <song or URL>` })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Media query required", `Usage: ${prefix}media play <song or URL>`, locale)] });
       return;
     }
     try {
@@ -109,9 +119,9 @@ export async function onPrefixMessage(message: Message) {
       const title = resolved.track.info?.title ?? query;
       const nextQueue = existing?.nowPlaying ? [...queue, title] : queue;
       await prisma.musicQueue.upsert({ where: { id: guildId }, create: { id: guildId, guildId, nowPlaying: existing?.nowPlaying ?? title, queue: JSON.stringify(nextQueue) }, update: { nowPlaying: existing?.nowPlaying ?? title, queue: JSON.stringify(nextQueue) } });
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media · play", body: `Resolved **${title}** through Lavalink node **${resolved.node}**.` })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Media · play", `Resolved **${title}** through Lavalink node **${resolved.node}**.`, locale)] });
     } catch (error) {
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Media unavailable", body: error instanceof Error ? error.message : "All Lavalink nodes are unavailable." })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Media unavailable", error instanceof Error ? error.message : "All Lavalink nodes are unavailable.", locale)] });
     }
     return;
   }
@@ -119,16 +129,16 @@ export async function onPrefixMessage(message: Message) {
   if (root === "admin" && ["announce", "broadcast"].includes(tokens[0]?.toLowerCase() ?? "")) {
     const ownerIds = (process.env.BOT_OWNER_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean);
     if (tokens[0] === "broadcast" && (!ownerIds.length || !ownerIds.includes(message.author.id))) {
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Admin command denied", body: "Only the configured bot owner can use this broadcast command." })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Admin command denied", "Only the configured bot owner can use this broadcast command.", locale)] });
       return;
     }
     if (tokens[0] !== "broadcast" && !message.member?.permissions.has(PermissionFlagsBits.ManageMessages)) {
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Admin command denied", body: "Manage Messages is required for announcements." })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Admin command denied", "Manage Messages is required for announcements.", locale)] });
       return;
     }
     const text = tokens.slice(1).join(" ").trim();
     if (!text) {
-      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Announcement text required", body: `Usage: ${prefix}admin ${tokens[0]} <message>` })] });
+      await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Announcement text required", `Usage: ${prefix}admin ${tokens[0]} <message>`, locale)] });
       return;
     }
     if (tokens[0] === "announce") {
@@ -137,7 +147,7 @@ export async function onPrefixMessage(message: Message) {
       const channel = guild.systemChannel;
       if (channel) await channel.send({ content: `📢 **Aeris announcement**\\n${text}` }).catch(() => undefined);
     }
-    await message.reply({ flags: MessageFlags.IsComponentsV2, components: [containerResponse({ title: "Announcement sent", body: "The announcement operation completed." })] });
+    await message.reply({ flags: MessageFlags.IsComponentsV2, components: [localized("Announcement sent", "The announcement operation completed.", locale)] });
     return;
   }
 
@@ -146,6 +156,6 @@ export async function onPrefixMessage(message: Message) {
     : `Available prefix command group: **${prefix}${command}**. Add a subcommand to run an operation.`;
   await message.reply({
     flags: MessageFlags.IsComponentsV2,
-    components: [containerResponse({ title: "Aeris prefix command", body: description })],
+    components: [localized("Aeris prefix command", description, locale)],
   });
 }

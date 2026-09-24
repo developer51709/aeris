@@ -1,5 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 const MODULES: [string, string][] = [
   ["🛡️ Automod", "Word filters, link filters, spam & raid protection"],
@@ -15,6 +17,7 @@ const MODULES: [string, string][] = [
 export default {
   data: new SlashCommandBuilder().setName("help").setDescription("Learn what Aeris can do"),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const embed = aerisEmbed()
       .setColor(COLORS.primary)
       .setTitle("✨ Aeris — Feature Overview")
@@ -23,6 +26,7 @@ export default {
       )
       .setURL("https://aeris.example/docs");
 
-    await interaction.reply({ embeds: [embed] });
+    localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
   },
 };

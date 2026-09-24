@@ -4,6 +4,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -20,6 +22,7 @@ export default {
         .setDescription("Show bot runtime stats"),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === "info") {
@@ -37,6 +40,7 @@ export default {
         )
         .setURL(invite);
 
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
       return;
     }
@@ -62,6 +66,7 @@ export default {
           { name: "Uptime", value: uptimeStr, inline: true },
         );
 
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     }
   },

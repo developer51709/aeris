@@ -8,6 +8,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { successEmbed, aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -23,6 +25,7 @@ export default {
     )
     .addSubcommand((sub) => sub.setName("close").setDescription("Close the current ticket")),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const subcommand = interaction.options.getSubcommand();
 
@@ -56,6 +59,7 @@ export default {
       }
 
       const embed = successEmbed("Ticket Panel Created", "The ticket panel has been set up in this channel.");
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
@@ -65,6 +69,7 @@ export default {
         .setColor(COLORS.warning)
         .setTitle("🔒 Closing Ticket")
         .setDescription("This ticket is being closed…");
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed], ephemeral: true });
       await interaction.channel?.delete().catch(() => undefined);
     }

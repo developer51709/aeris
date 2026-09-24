@@ -6,6 +6,8 @@ import {
 } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { successEmbed, aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -36,6 +38,7 @@ export default {
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const subcommand = interaction.options.getSubcommand();
 
@@ -48,6 +51,7 @@ export default {
         "Welcome Channel Set",
         `Welcome messages will now be sent to ${channel}.`,
       );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "message") {
       const text = interaction.options.getString("text")!;
@@ -56,6 +60,7 @@ export default {
         "Welcome Message Updated",
         `New welcome message:\n\n${text}`,
       );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     } else if (subcommand === "dm") {
       const enabled = interaction.options.getBoolean("enabled")!;
@@ -68,6 +73,7 @@ export default {
         `Welcome DMs ${enabled ? "Enabled" : "Disabled"}`,
         enabled ? "New members will receive a DM on join." : "DMs have been turned off.",
       );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     }
   },

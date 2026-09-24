@@ -3,6 +3,8 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { aerisEmbed, COLORS } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,6 +24,7 @@ export default {
         .addUserOption((opt) => opt.setName("user").setDescription("User to inspect").setRequired(false)),
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === "serverinfo") {
@@ -41,6 +44,7 @@ export default {
         embed.setThumbnail(guild.iconURL({ size: 256 }));
       }
 
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
       return;
     }
@@ -59,6 +63,7 @@ export default {
           { name: "Roles", value: String(Math.max(0, (member?.roles.cache.size ?? 1) - 1)), inline: true },
         );
 
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
       return;
     }
@@ -73,6 +78,7 @@ export default {
         .setImage(avatarUrl)
         .setURL(avatarUrl);
 
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     }
   },

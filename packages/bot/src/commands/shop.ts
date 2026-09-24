@@ -1,6 +1,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { prisma } from "@aeris/shared";
 import { aerisEmbed, COLORS, successEmbed, errorEmbed } from "../lib/embeds.js";
+import { getGuildLocale } from "../locale.js";
+import { localizeEmbed } from "../lib/embeds.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -15,6 +17,7 @@ export default {
     )
     .addSubcommand((sub) => sub.setName("inventory").setDescription("Show your inventory")),
   async execute(interaction: ChatInputCommandInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     const guildId = interaction.guildId!;
     const userId = interaction.user.id;
     const key = `${guildId}:${userId}`;
@@ -27,7 +30,8 @@ export default {
           .setColor(COLORS.neutral)
           .setTitle("🛒 Shop")
           .setDescription("The shop is empty. Server admins can add items from the dashboard.");
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         return;
       }
       const lines = items.map(
@@ -38,6 +42,7 @@ export default {
         .setColor(COLORS.economy)
         .setTitle("🛒 Shop")
         .setDescription(lines.join("\n"));
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
       return;
     }
@@ -46,7 +51,7 @@ export default {
       const name = interaction.options.getString("item")!;
       const item = await prisma.economyShopItem.findFirst({ where: { guildId, name } });
       if (!item) {
-        await interaction.reply({ embeds: [errorEmbed("Item Not Found", `**${name}** doesn't exist in the shop.`)] });
+        await interaction.reply({ embeds: [localizeEmbed(errorEmbed("Item Not Found", `**${name}** doesn't exist in the shop.`), locale)] });
         return;
       }
       const wallet = await prisma.economyUser.upsert({
@@ -55,7 +60,7 @@ export default {
         update: {},
       });
       if (wallet.cash < item.price) {
-        await interaction.reply({ embeds: [errorEmbed("Insufficient Funds", "You don't have enough coins to buy this item.")] });
+        await interaction.reply({ embeds: [localizeEmbed(errorEmbed("Insufficient Funds", "You don't have enough coins to buy this item."), locale)] });
         return;
       }
       await prisma.economyUser.update({ where: { id: key }, data: { cash: { decrement: item.price } } });
@@ -68,6 +73,7 @@ export default {
         "Item Purchased",
         `Bought **${item.name}** for ${item.price.toLocaleString()} coins.`,
       );
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
       return;
     }
@@ -79,7 +85,8 @@ export default {
           .setColor(COLORS.neutral)
           .setTitle("🎒 Inventory")
           .setDescription("Your inventory is empty.");
-        await interaction.reply({ embeds: [embed] });
+        localizeEmbed(embed, locale);
+      await interaction.reply({ embeds: [embed] });
         return;
       }
       const lines = items.map(
@@ -89,6 +96,7 @@ export default {
         .setColor(COLORS.economy)
         .setTitle("🎒 Inventory")
         .setDescription(lines.join("\n"));
+      localizeEmbed(embed, locale);
       await interaction.reply({ embeds: [embed] });
     }
   },
